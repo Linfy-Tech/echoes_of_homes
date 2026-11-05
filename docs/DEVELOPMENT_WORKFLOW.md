@@ -5,6 +5,7 @@
 - Node.js **LTS** — the OpenAI Agents SDK requires Node 22+ **[S6]**; use the current Active LTS line at M1 (record in `.nvmrc`/`package.json#engines`).
 - pnpm (version pinned via `packageManager` field), Docker (local Postgres via Compose / Testcontainers), ffmpeg + ffprobe (worker), Playwright browsers (e2e).
 - Railway CLI for IaC plan/apply and DB tunnels (maintainers only).
+- The scaffold's pnpm 12.16.1 pin inherits its [24-hour release-age default](https://github.com/pnpm/pnpm/blob/v12.16.1/pnpm/docs/settings/dependency-resolution.md#minimumreleaseage); the auth-storage slice adds no project override or exception.
 
 ## 2. Local setup
 

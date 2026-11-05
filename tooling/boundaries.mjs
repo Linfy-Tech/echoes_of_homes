@@ -17,7 +17,7 @@ const allowed = {
 };
 const owner = (file) => /^(?:apps|packages|workers)\/([^/]+)(?:\/|$)/.exec(file)?.[1];
 // New external dependencies require an explicit boundary review in their slice.
-const external = { validation: ['zod'] };
+const external = { validation: ['zod'], auth: ['better-auth', 'pg', 'uuid'] };
 const providers = /^(openai|cloudinary|@google-cloud\/[^/]+|@anthropic-ai\/[^/]+|@nebius\/[^/]+|@huggingface\/[^/]+|replicate|@aws-sdk\/[^/]+)(\/|$)/;
 
 export default {

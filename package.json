@@ -9,7 +9,8 @@
   "scripts": {
     "typecheck": "turbo run typecheck",
     "lint": "eslint . --no-inline-config --max-warnings 0 && node --test tests/unit/boundaries.test.mjs",
-    "test": "node --test tests/unit/*.test.mjs"
+    "test": "node --test tests/unit/*.test.mjs",
+    "test:auth-storage": "node --test --test-timeout=30000 packages/auth/test/storage.test.mjs"
   },
   "devDependencies": {
     "eslint": "10.14.0",

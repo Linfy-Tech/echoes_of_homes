@@ -44,7 +44,7 @@ Legend — **Owner:** F = founder/product owner, E = engineering, L = legal coun
 | OQ-009 | Encrypt transcript/translation text columns at application level? | Not in R1 (review UX, constraints); revisit R4 | E | R4 | Deferred |
 | OQ-010 | Does `destroy` remove eager derivatives? What remains after deleting backup versions of a reserved public ID **[S10]**? | Explicit derived + backup deletion regardless; confirm with support | E | M0 | Open |
 | OQ-011 | Phone/WhatsApp OTP sign-in: cost, SIM-swap risk, provider | Defer to R3 | F/E | R3 | Deferred |
-| OQ-012 | Auth implementation (maintained library vs minimal in-house with vetted primitives) and email provider | Evaluate Better Auth first; compare minimal in-house sessions using vetted primitives (options below); founder decides; email provider still open | E | M1 | Open |
+| OQ-012 | Auth library, email-OTP flow, and session store | Founder selected Better Auth + email-OTP plugin + Postgres sessions on 2026-11-05; see ADR-010. Storage compatibility resolved in OQ-039; live email vendor is OQ-040 | F/E | M1 | Resolved (selection) |
 | OQ-013 | Observability and error-reporting vendor (must support PII scrubbing; region) | Compare Grafana Cloud and Better Stack via OTLP (options below); founder decides | E | M1 | Open |
 | OQ-016 | Incremental SHA-256 library for browser (licence, performance on low-end Android) | Evaluate WASM options in M3 | E | M3 | Open |
 | OQ-017 | Shared rate-limit store before scaling API beyond one replica | Postgres-backed limiter | E | R4 | Deferred |
@@ -54,6 +54,8 @@ Legend — **Owner:** F = founder/product owner, E = engineering, L = legal coun
 | OQ-028 | Licences of datasets used to train `Sunbird/asr-whisper-51-african-languages` **[S19]** | Diligence before selection | E | M0 | Open |
 | OQ-029 | Is isiXhosa (`xho_Latn`) in Omnilingual ASR `supported_langs` **[S20]**? | Check programmatically | E | M0 | Open |
 | OQ-030 | GPU hosting for self-hosted ASR (Railway GPU availability UNVERIFIED; alternatives incl. Nebius compute) and its data region | Only if a self-hosted candidate wins | E | M4 | Open |
+| OQ-039 | How will Better Auth's logical user/session/verification records map to DATA_MODEL §3 without weakening SECURITY_AND_PRIVACY §7? | Custom Postgres adapter verified for the restricted email-OTP/session subset: ten real PostgreSQL 16.15 tests pass with Better Auth 1.7.16. See [compatibility evidence](auth-storage-compatibility.md) for guarantees and unsupported operations | E/F | M1 auth-library implementation | Resolved (restricted storage compatibility) |
+| OQ-040 | Which live email delivery provider will carry sign-in codes/links? | Keep fake email for local/tests; founder selects vendor after region, DPA, cost, and deliverability review. Better Auth's OTP plugin does not select a delivery vendor | F/E | M1 live email integration | Open |
 
 ## Language and UX
 
@@ -63,9 +65,9 @@ Legend — **Owner:** F = founder/product owner, E = engineering, L = legal coun
 | OQ-037 | Should praise poetry segments default to "keep in isiXhosa" rather than translated? | Ask families in discovery | X/F | M6 |
 | OQ-038 | Appropriate honorific register for addressing elders in UI copy | Translators + advisor | X | M2 |
 
-## M1 scaffold proposals — pending founder decision
+## M1 auth decision and remaining proposals
 
-No library, vendor, or paid resource is selected or installed by these proposals.
+Better Auth is selected by the founder and its pinned dependency is installed locally; no paid resource has been provisioned. OQ-039 is resolved for the documented restricted adapter; OQ-013 and OQ-040 remain open.
 
-- **OQ-012:** [Better Auth](https://better-auth.com/docs/plugins/email-otp) provides email OTP tooling, but needs a fit review for our hashed/peppered sessions, schema, enumeration resistance, and admin MFA. Minimal in-house sessions using vetted `node:crypto` primitives fit the exact contract but add security implementation and maintenance burden. Recommend evaluating Better Auth first against §7; retain fake email locally and decide the live email provider separately.
+- **OQ-012 (selection resolved):** Better Auth + email-OTP plugin, with server-side sessions in Postgres. Version 1.7.17's MIT licence and Postgres support were verified before coding; its standard persistence contract is not a direct match for our schema. ADR-010 records the evidence and proposed compatibility slice (OQ-039). Custom storage integration is now verified for the documented subset; Fastify is not required for these tests. Email delivery vendor selection is tracked separately as OQ-040.
 - **OQ-013:** [Grafana Cloud via OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/) offers a unified telemetry backend but needs retention/cardinality controls. [Better Stack via OpenTelemetry](https://betterstack.com/docs/logs/open-telemetry/) is another hosted ingestion option but needs a metric/trace coverage and cost review. Recommend comparing both using synthetic, content-free telemetry; confirm region, DPA, redaction, retention, and costs before selection. Application-side field allow-lists remain mandatory regardless of vendor.

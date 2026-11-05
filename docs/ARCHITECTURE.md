@@ -153,7 +153,7 @@ Browser requests `GET /v1/stories/{id}/audio?rendition=playback` with `Range`. A
 | Jobs | Graphile Worker + `processing_jobs` domain table | Proposed (spike in M0) | ADR-009 |
 | AI | Provider abstraction; models selected by benchmark | Accepted (abstraction); models open | ADR-005 |
 | Orchestration | Deterministic pipeline; Agents SDK not used in R1 | Proposed | ADR-006 |
-| Auth | Server-side sessions in Postgres; email link/code; library choice in M1 (OQ-012) | Proposed | — |
+| Auth | Better Auth + email-OTP plugin; server-side sessions in Postgres; preserve email link/code requirements | Selected by founder; restricted storage adapter verified (OQ-039) | ADR-010 |
 | Observability | OpenTelemetry SDK → OTLP backend (vendor OQ-013), structured JSON logs | Proposed | — |
 | Monorepo | pnpm workspaces + Turborepo | Proposed | — |
 | Testing | Vitest, Playwright, axe-core, Testcontainers (Postgres) | Proposed | — |
