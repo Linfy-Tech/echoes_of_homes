@@ -1,0 +1,14 @@
+{
+  "name": "@echoes-of-home/validation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --build --pretty false"
+  },
+  "exports": {
+    "./env": "./src/env.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
+  }
+}

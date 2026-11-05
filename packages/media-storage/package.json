@@ -1,0 +1,8 @@
+{
+  "name": "@echoes-of-home/media-storage",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --build --pretty false"
+  }
+}

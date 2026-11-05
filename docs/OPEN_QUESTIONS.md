@@ -44,8 +44,8 @@ Legend — **Owner:** F = founder/product owner, E = engineering, L = legal coun
 | OQ-009 | Encrypt transcript/translation text columns at application level? | Not in R1 (review UX, constraints); revisit R4 | E | R4 | Deferred |
 | OQ-010 | Does `destroy` remove eager derivatives? What remains after deleting backup versions of a reserved public ID **[S10]**? | Explicit derived + backup deletion regardless; confirm with support | E | M0 | Open |
 | OQ-011 | Phone/WhatsApp OTP sign-in: cost, SIM-swap risk, provider | Defer to R3 | F/E | R3 | Deferred |
-| OQ-012 | Auth implementation (maintained library vs minimal in-house with vetted primitives) and email provider | Evaluate in M1 against `SECURITY_AND_PRIVACY.md` §7 rules | E | M1 | Open |
-| OQ-013 | Observability and error-reporting vendor (must support PII scrubbing; region) | OpenTelemetry → vendor chosen in M1 | E | M1 | Open |
+| OQ-012 | Auth implementation (maintained library vs minimal in-house with vetted primitives) and email provider | Evaluate Better Auth first; compare minimal in-house sessions using vetted primitives (options below); founder decides; email provider still open | E | M1 | Open |
+| OQ-013 | Observability and error-reporting vendor (must support PII scrubbing; region) | Compare Grafana Cloud and Better Stack via OTLP (options below); founder decides | E | M1 | Open |
 | OQ-016 | Incremental SHA-256 library for browser (licence, performance on low-end Android) | Evaluate WASM options in M3 | E | M3 | Open |
 | OQ-017 | Shared rate-limit store before scaling API beyond one replica | Postgres-backed limiter | E | R4 | Deferred |
 | OQ-024 | Should named private viewers require `share_family` scope or a separate scope? | Require `share_family` in R1 | F/L | M7 | Open |
@@ -62,3 +62,10 @@ Legend — **Owner:** F = founder/product owner, E = engineering, L = legal coun
 | OQ-036 | Agreed isiXhosa terms for "consent", "translation", "family circle", "rights holder", "custodian" | Copy glossary built with translators | X | M2 |
 | OQ-037 | Should praise poetry segments default to "keep in isiXhosa" rather than translated? | Ask families in discovery | X/F | M6 |
 | OQ-038 | Appropriate honorific register for addressing elders in UI copy | Translators + advisor | X | M2 |
+
+## M1 scaffold proposals — pending founder decision
+
+No library, vendor, or paid resource is selected or installed by these proposals.
+
+- **OQ-012:** [Better Auth](https://better-auth.com/docs/plugins/email-otp) provides email OTP tooling, but needs a fit review for our hashed/peppered sessions, schema, enumeration resistance, and admin MFA. Minimal in-house sessions using vetted `node:crypto` primitives fit the exact contract but add security implementation and maintenance burden. Recommend evaluating Better Auth first against §7; retain fake email locally and decide the live email provider separately.
+- **OQ-013:** [Grafana Cloud via OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/) offers a unified telemetry backend but needs retention/cardinality controls. [Better Stack via OpenTelemetry](https://betterstack.com/docs/logs/open-telemetry/) is another hosted ingestion option but needs a metric/trace coverage and cost review. Recommend comparing both using synthetic, content-free telemetry; confirm region, DPA, redaction, retention, and costs before selection. Application-side field allow-lists remain mandatory regardless of vendor.
