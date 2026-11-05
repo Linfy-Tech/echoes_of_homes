@@ -11,3 +11,5 @@ test-results/
 .DS_Store
 # Evaluation audio and gold data never live in this repo
 tests/evaluation/data/
+.turbo/
+*.tsbuildinfo

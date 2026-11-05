@@ -1,0 +1,8 @@
+{
+  "name": "@echoes-of-home/story-processing",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --build --pretty false"
+  }
+}

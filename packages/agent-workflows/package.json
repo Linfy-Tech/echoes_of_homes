@@ -1,0 +1,8 @@
+{
+  "name": "@echoes-of-home/agent-workflows",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --build --pretty false"
+  }
+}

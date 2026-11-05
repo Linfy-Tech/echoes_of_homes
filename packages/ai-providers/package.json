@@ -1,0 +1,8 @@
+{
+  "name": "@echoes-of-home/ai-providers",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --build --pretty false"
+  }
+}

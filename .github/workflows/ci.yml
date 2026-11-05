@@ -1,0 +1,26 @@
+name: CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Verify Node runtime
+        run: node --version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - name: Config scaffold regression tests
+        run: pnpm test
+      - name: Secret scan (full repository history)
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.0 git /repo --redact --exit-code 1
