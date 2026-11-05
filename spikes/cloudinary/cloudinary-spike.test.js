@@ -23,6 +23,7 @@ const resourceType = 'video';
 const deliveryType = 'authenticated';
 const chunkSize = 6_000_000;
 const totalBytes = 12_000_000;
+const resumeGapMs = Number(process.env.CLOUDINARY_RESUME_GAP_MS || 100);
 const tempFile = path.join(os.tmpdir(), `eoh-cloudinary-${runId}.wav`);
 
 function wavBuffer(bytes) {
@@ -102,7 +103,7 @@ async function main() {
     console.log(`account: cloud=${process.env.CLOUDINARY_CLOUD_NAME}, plan=${config.plan || 'not-reported'}, region=${config.region || 'not-reported'}`);
     try {
       const usage = await cloudinary.api.usage();
-      console.log(`usage: storage_bytes=${usage.storage?.usage ?? 'not-reported'}, credits_used=${usage.credits?.usage ?? 'not-reported'}`);
+      console.log(`usage: plan=${usage.plan ?? 'not-reported'}, tier=${usage.tier ?? 'not-reported'}, storage_bytes=${usage.storage?.usage ?? 'not-reported'}, credits_used=${usage.credits?.usage ?? 'not-reported'}`);
     } catch (error) {
       console.log(`usage: unavailable (${error.message || 'Admin API did not report usage'})`);
     }
@@ -112,7 +113,10 @@ async function main() {
 
     // Simulate an interruption. The second request uses the same upload ID,
     // with a newly signed timestamp, which is the refreshed-signature case.
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    const interruptedAt = Date.now();
+    await new Promise((resolve) => setTimeout(resolve, resumeGapMs));
+    const resumeAttemptAt = Date.now();
+    console.log(`resume gap: interrupted_at=${new Date(interruptedAt).toISOString()}, resume_attempt_at=${new Date(resumeAttemptAt).toISOString()}, elapsed_ms=${resumeAttemptAt - interruptedAt}`);
     try {
       uploadResult = await uploadChunk(source, chunkSize, source.length - 1, uploadId);
     } catch (error) {
@@ -183,20 +187,27 @@ async function main() {
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    const afterDelete = await countAssets();
-    assert.equal(afterDelete, 0);
-    console.log(`cleanup: matching assets=${afterDelete}`);
-
-    const backupVersions = resource.versions || [];
-    if (backupVersions.length && resource.asset_id) {
+    const deletedResource = await cloudinary.api.resource(publicId, {
+      resource_type: resourceType,
+      type: deliveryType,
+      versions: true,
+    }).catch(() => null);
+    const backupVersions = deletedResource?.versions || resource.versions || [];
+    const backupAssetId = deletedResource?.asset_id || resource.asset_id;
+    if (backupVersions.length && backupAssetId) {
       const versionIds = backupVersions.map((version) => version.version_id).filter(Boolean);
       if (versionIds.length) {
-        const backupDelete = await cloudinary.api.delete_backed_up_versions(resource.asset_id, versionIds);
-        console.log(`backup delete: result=${backupDelete.deleted ? 'deleted' : 'completed'}`);
+        const backupDelete = await cloudinary.api.delete_backed_up_assets(backupAssetId, versionIds);
+        console.log(`backup delete: version_ids=${backupDelete.deleted_version_ids?.length || 0}`);
       }
     } else {
       console.log('backup delete: no API-visible backup versions; account backup behavior requires console/vendor confirmation');
     }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const afterDelete = await countAssets();
+    assert.equal(afterDelete, 0);
+    console.log(`cleanup: matching assets=${afterDelete}`);
   } finally {
     try {
       await cloudinary.uploader.destroy(publicId, {

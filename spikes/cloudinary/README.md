@@ -25,9 +25,12 @@ npm install
 set -a
 source ../../.env.local
 set +a
-npm test
+CLOUDINARY_RESUME_GAP_MS=180000 npm test
 ```
 
 The test uses a unique `eoh/m0-spike/<run-id>` public ID and cleans up in a
 `finally` block. Do not run it against an account containing irreplaceable
 production assets without reviewing the generated prefix and cleanup behavior.
+
+`CLOUDINARY_RESUME_GAP_MS` controls the simulated interruption. The M0
+follow-up uses `180000` (three minutes) and records the actual wall-clock gap.
