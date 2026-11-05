@@ -2,6 +2,7 @@ import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
 const scope = '@echoes-of-home/';
+// Workspace import rules follow docs/ARCHITECTURE.md section 4.
 const allowed = {
   web: ['shared-types', 'validation'],
   api: ['shared-types', 'validation', 'auth', 'database', 'media-storage', 'agent-workflows'],
