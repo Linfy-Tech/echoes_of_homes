@@ -99,6 +99,12 @@ Every folder contains a `README.md` describing its responsibilities and boundari
 
 See [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) and [`docs/ENVIRONMENT_VARIABLES.md`](docs/ENVIRONMENT_VARIABLES.md).
 
+## Built with OpenAI Codex
+
+Codex helped turn the M0 specifications into reproducible queue and Cloudinary
+spikes, with evidence recorded in the [queue report](spikes/queue/REPORT.md) and
+[Cloudinary report](spikes/cloudinary/REPORT.md).
+
 ## Important caveats
 
 - **Language quality is unproven.** No ASR or translation model has yet been benchmarked by this project on isiXhosa oral storytelling. See [`docs/ASR_BENCHMARK.md`](docs/ASR_BENCHMARK.md).
