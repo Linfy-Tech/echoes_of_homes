@@ -62,6 +62,21 @@ Admin API deleted that version, and cleanup verified zero matching assets. A
 subsequent short validation run reproduced the same result with
 `backup delete: version_ids=1` and `cleanup: matching assets=0`.
 
+## OQ-010 corrected validation
+
+After removing the swallowed error handler around the deleted-resource lookup,
+the focused rerun produced:
+
+```text
+destroy: result=ok
+derived delete: result=deleted
+backup delete: version_ids=1
+cleanup: matching assets=0
+```
+
+The `api.resource(..., versions: true)` query now fails the test if Cloudinary
+returns an error; it does not fall back to the pre-delete resource object.
+
 ## Open-question outcomes
 
 | OQ | Status | Evidence / decision |

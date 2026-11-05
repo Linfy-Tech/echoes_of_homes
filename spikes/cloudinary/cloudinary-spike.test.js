@@ -191,7 +191,7 @@ async function main() {
       resource_type: resourceType,
       type: deliveryType,
       versions: true,
-    }).catch(() => null);
+    });
     const backupVersions = deletedResource?.versions || resource.versions || [];
     const backupAssetId = deletedResource?.asset_id || resource.asset_id;
     if (backupVersions.length && backupAssetId) {
