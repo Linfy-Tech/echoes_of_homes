@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import { betterAuth } from 'better-auth';
 import { emailOTP } from 'better-auth/plugins';
@@ -63,7 +63,7 @@ test('OQ-039 real Better Auth OTP sign-in stores only encrypted email and pepper
   assert.equal(crypto.decrypt(user.email), email);
   assert.deepEqual(user.email_lookup_hash, crypto.emailHash(email));
   const session = (await pool.query('SELECT * FROM sessions')).rows[0];
-  assert.deepEqual(session.token_hash, crypto.tokenHash(result.token));
+  assert.deepEqual(session.token_hash, createHmac('sha256', keys.pepper).update(result.token).digest());
   assert.equal(session.token, undefined);
   assert.match(session.id, /^[0-9a-f-]{14}7[0-9a-f-]+$/);
   assert.ok(session.expires_at - session.created_at <= 30 * 86400 * 1000);
@@ -84,7 +84,14 @@ test('OQ-039 five wrong guesses exhaust one challenge and its expiry never exten
   await weak.api.sendVerificationOTP({ body: { email, type: 'sign-in' } });
   const otp = delivered.otp;
   const original = (await pool.query('SELECT * FROM auth_challenges WHERE email_lookup_hash=$1', [crypto.emailHash(email)])).rows[0];
-  for (let i = 0; i < 5; i++) await assert.rejects(weak.api.signInEmailOTP({ body: { email, otp: otp === '000000' ? '111111' : '000000' } }));
+  for (let i = 1; i <= 5; i++) {
+    await assert.rejects(weak.api.signInEmailOTP({ body: { email, otp: otp === '000000' ? '111111' : '000000' } }));
+    const retry = (await pool.query('SELECT * FROM auth_challenges WHERE id=$1', [original.id])).rows[0];
+    assert.equal(retry.attempts, i);
+    assert.deepEqual(retry.expires_at, original.expires_at);
+    if (i < 5) assert.equal(retry.consumed_at, null);
+    else assert.ok(retry.consumed_at);
+  }
   await assert.rejects(weak.api.signInEmailOTP({ body: { email, otp } }));
   const rows = (await pool.query('SELECT * FROM auth_challenges WHERE email_lookup_hash=$1', [crypto.emailHash(email)])).rows;
   assert.equal(rows.length, 1);
@@ -226,4 +233,21 @@ test('OQ-039 fresh sign-in rotates credentials; ID-based and all-session revocat
   assert.ok(await auth.api.getSession({ headers: headers(second) }));
   await auth.api.revokeSessions({ headers: headers(second) });
   assert.equal(await auth.api.getSession({ headers: headers(second) }), null);
+});
+
+
+test('OQ-039 session token digest matches an independent HMAC-SHA256 vector', () => {
+  const pepper = Buffer.from(Array.from({ length: 32 }, (_, index) => index));
+  const actual = credentials({ ...keys, pepper }).tokenHash('synthetic-session-token');
+  assert.equal(actual.toString('hex'), 'ddf1e179a9c88f5d6ebf4cf165830d1bed71105ef4d76753861f4bb1859eec3b');
+  assert.notDeepEqual(actual, credentials({ ...keys, pepper: Buffer.alloc(32, 7) }).tokenHash('synthetic-session-token'));
+});
+
+test('OQ-039 invalid retry restore never inserts a replacement challenge', async () => {
+  const store = adapter()(auth.options);
+  const email = 'invalid-retry@example.invalid';
+  await assert.rejects(store.create({ model: 'verification', data: {
+    identifier: `sign-in-otp-${email}`, value: `${crypto.otpHash('123456')}:1`, expiresAt: new Date(Date.now() + 600000),
+  } }), { message: 'Auth persistence rejected' });
+  assert.equal((await pool.query('SELECT count(*)::int AS count FROM auth_challenges WHERE email_lookup_hash=$1', [crypto.emailHash(email)])).rows[0].count, 0);
 });

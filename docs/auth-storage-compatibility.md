@@ -12,7 +12,7 @@ The supported user lifecycle creates users only after OTP proof (`emailVerified:
 
 | Hardened requirement | Implementation / executed evidence |
 |---|---|
-| No raw session credential in DB | Adapter generates 32 random bytes; only SHA-256(token ∥ pepper) is inserted. Tests compare the stored digest and validate rotation. |
+| No raw session credential in DB | Adapter generates 32 random bytes; only HMAC-SHA256(pepper, token) is inserted. Tests compare the stored digest and validate rotation. |
 | No plaintext email in DB | AES-256-GCM with authenticated key ID/context; keyring rotation/tamper tests; user create/read/update round trips. |
 | Indexed identity lookup, no decrypt-and-scan | Email lookup is HMAC equality against the unique index. Tests capture the adapter's actual query/parameters and EXPLAIN its indexable plan. The small-fixture plan test disables sequential planning only on its dedicated test connection, then resets it. |
 | Structured challenges | Hash bytes, integer attempts, expiry, and consumed timestamps map to DATA_MODEL §3 columns; no generic verification table. |
@@ -33,10 +33,12 @@ The supported user lifecycle creates users only after OTP proof (`emailVerified:
 
 ## Reproduce / validation
 
-`pnpm test:auth-storage` runs ten Node tests. Point `POSTGRES_TEST_BIN` at an isolated PostgreSQL 16+ `bin` directory to create/stop a disposable Unix-socket cluster, or set `POSTGRES_TEST_URL` to an **empty loopback-only database named `echoes_auth_test` (or prefixed `echoes_auth_test_`) only**. No real content/provider keys are used. CI supplies a loopback-only disposable PostgreSQL 16 service and runs the same command; hosted results require a later authorised push.
+`pnpm test:auth-storage` runs twelve Node tests. Point `POSTGRES_TEST_BIN` at an isolated PostgreSQL 16+ `bin` directory to create/stop a disposable Unix-socket cluster, or set `POSTGRES_TEST_URL` to an **empty loopback-only database named `echoes_auth_test` (or prefixed `echoes_auth_test_`) only**. No real content/provider keys are used. CI supplies a loopback-only disposable PostgreSQL 16 service and runs the same command; hosted results require a later authorised push.
 
 Also run `pnpm typecheck`, `pnpm lint`, `pnpm test`, frozen install, and Gitleaks. Two separate read-only Codex reviewer sub-agents (`auth_boundary_review`, `auth_security_review`, via `collaboration.spawn_agent`) identified draft races/retention/validation issues; fixes have regression coverage. This is automated review, not human approval.
 
 Dependency purpose/licences: Better Auth 1.7.16 (MIT, library under test/adapter API), pg 8.16.3 (MIT, Postgres queries), uuid 13.0.0 (MIT, UUIDv7), @types/node 24.10.0 and @types/pg 8.15.6 (MIT, strict compilation). The temporary PostgreSQL binary package is MIT-packaged/PostgreSQL-licensed and is not a project dependency. Generated lockfile changes are reviewed separately from handwritten changes. No package-manager security settings were weakened.
 
 Version pin: 1.7.17 was tested initially but rejected by pnpm's 24-hour minimum-release-age guard. The final pin is 1.7.16 (published 2026-11-03T21:23:56Z), which includes the [vendor's OTP security fix](https://github.com/better-auth/better-auth/security/advisories/GHSA-2f9c-7xj7-gh55). Its OTP source is unchanged in 1.7.17; the later internal-session changes affect disabled secondary storage. The complete suite is rerun on the final pin; no release-age exception is retained.
+
+The founder requested HMAC-SHA256(pepper, token) in the follow-up: DATA_MODEL §3 is authoritative; ADR-010 retains its historical pre-implementation example. A fixed HMAC vector and independent database-digest assertion cover the new construction. No auth service has been deployed by this slice; the adapter does not retain a fallback for legacy concatenated digests.

@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto';
 
 export function credentials(keys: { pepper: Buffer; encryption: Readonly<Record<string, Buffer>>; currentKeyId: string; lookup: Buffer }) {
   if (!keys || !Buffer.isBuffer(keys.pepper) || !Buffer.isBuffer(keys.lookup) || keys.pepper.length !== 32 || keys.lookup.length !== 32 || typeof keys.currentKeyId !== 'string' || !/^[a-zA-Z0-9_-]{1,32}$/.test(keys.currentKeyId) || !keys.encryption || !Object.hasOwn(keys.encryption, keys.currentKeyId) || Object.entries(keys.encryption).some(([id, key]) => !/^[a-zA-Z0-9_-]{1,32}$/.test(id) || !Buffer.isBuffer(key) || key.length !== 32)) throw new Error('Invalid auth keys');
@@ -6,7 +6,7 @@ export function credentials(keys: { pepper: Buffer; encryption: Readonly<Record<
   return {
     otpHash: (otp: string) => { if (!/^\d{6}$/.test(otp)) throw new Error('Invalid OTP'); return createHmac('sha256', createHmac('sha256', keys.lookup).update('echoes:otp:v1').digest()).update(otp).digest('base64url'); },
     token: () => randomBytes(32).toString('base64url'),
-    tokenHash: (token: string) => createHash('sha256').update(token).update(keys.pepper).digest(),
+    tokenHash: (token: string) => createHmac('sha256', keys.pepper).update(token).digest(),
     emailHash: (email: string) => createHmac('sha256', keys.lookup).update(email.trim().toLowerCase()).digest(),
     encrypt(email: string) {
       const keyId = Buffer.from(keys.currentKeyId);

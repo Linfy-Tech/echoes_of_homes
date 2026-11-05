@@ -68,7 +68,7 @@ erDiagram
 |---|---|---|
 | id | uuid PK | |
 | user_id | uuid FK users ON DELETE CASCADE | |
-| token_hash | bytea UNIQUE NOT NULL | SHA-256(token ‖ pepper); raw token only in cookie |
+| token_hash | bytea UNIQUE NOT NULL | HMAC-SHA256(pepper, token); raw token only in cookie |
 | created_at, last_seen_at, expires_at | timestamptz | absolute + idle expiry enforced in code |
 | revoked_at | timestamptz NULL | |
 | user_agent_summary | text NULL | coarse ("Android · Chrome"), no full UA string |
