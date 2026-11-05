@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.log
+.DS_Store
+# Evaluation audio and gold data never live in this repo
+tests/evaluation/data/

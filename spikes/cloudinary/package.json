@@ -1,0 +1,11 @@
+{
+  "name": "echoes-of-home-cloudinary-spike",
+  "private": true,
+  "description": "M0 Cloudinary account spike for OQ-002, OQ-003, OQ-004, and OQ-010",
+  "scripts": {
+    "test": "node cloudinary-spike.test.js"
+  },
+  "dependencies": {
+    "cloudinary": "2.11.0"
+  }
+}
