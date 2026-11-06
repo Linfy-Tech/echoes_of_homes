@@ -17,7 +17,11 @@ const allowed = {
 };
 const owner = (file) => /^(?:apps|packages|workers)\/([^/]+)(?:\/|$)/.exec(file)?.[1];
 // New external dependencies require an explicit boundary review in their slice.
-const external = { validation: ['zod'], auth: ['better-auth', 'pg', 'uuid'] };
+const external = {
+  validation: ['zod'],
+  auth: ['better-auth', 'pg', 'uuid'],
+  database: ['@testcontainers/postgresql', 'drizzle-orm', 'drizzle-kit', 'pg'],
+};
 const providers = /^(openai|cloudinary|@google-cloud\/[^/]+|@anthropic-ai\/[^/]+|@nebius\/[^/]+|@huggingface\/[^/]+|replicate|@aws-sdk\/[^/]+)(\/|$)/;
 
 export default {
