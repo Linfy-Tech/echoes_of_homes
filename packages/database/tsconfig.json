@@ -4,5 +4,8 @@
     "src/**/*",
     "drizzle.config.ts"
   ],
-  "files": []
+  "files": [],
+  "compilerOptions": {
+    "allowImportingTsExtensions": true
+  }
 }
