@@ -58,8 +58,9 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
     if (statusCode === 429) return problem(reply, 429, 'rate_limited', correlationId);
     if (error instanceof AuthorizationError) return problem(reply, 403, 'forbidden', correlationId);
     if (error instanceof z.ZodError) return problem(reply, 400, 'validation_failed', correlationId, error.issues.map((issue) => ({ path: issue.path.join('.'), code: issue.code })));
-    if (error.message === 'unauthenticated') return problem(reply, 401, 'unauthenticated', correlationId);
-    if (error.message === 'validation_failed') return problem(reply, 400, 'validation_failed', correlationId);
+    const message = error instanceof Error ? error.message : '';
+    if (message === 'unauthenticated') return problem(reply, 401, 'unauthenticated', correlationId);
+    if (message === 'validation_failed') return problem(reply, 400, 'validation_failed', correlationId);
     request.log.error({ err: error, correlationId }, 'request failed');
     return problem(reply, 500, 'internal_error', correlationId);
   });
