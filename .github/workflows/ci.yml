@@ -31,8 +31,14 @@ jobs:
       - name: Verify Node runtime
         run: node --version
       - run: pnpm install --frozen-lockfile
+      - name: Dependency vulnerability audit
+        run: pnpm audit --audit-level high
       - run: pnpm typecheck
       - run: pnpm lint
+      - name: OpenAPI generation drift check
+        run: pnpm openapi:check
+      - name: OpenAPI route coverage tests
+        run: pnpm test:openapi
       - name: Config scaffold regression tests
         run: pnpm test
       - name: Web translation catalogue parity

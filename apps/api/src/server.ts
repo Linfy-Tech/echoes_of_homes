@@ -4,6 +4,9 @@ import cookie from '@fastify/cookie';
 import csrfProtection from '@fastify/csrf-protection';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
+import type { ZodTypeProvider } from '@fastify/type-provider-zod';
+import { hasZodFastifySchemaValidationErrors, jsonSchemaTransform, serializerCompiler, validatorCompiler } from '@fastify/type-provider-zod';
 import { z } from 'zod';
 import { assertCan, AuthorizationError, type Actor, type StoryResourceContext } from '@echoes-of-home/auth/policy';
 import { createStructuredLogger, startObservability } from '@echoes-of-home/observability';
@@ -11,6 +14,7 @@ import { LocalAuthService, type AuthService, type Session } from './auth-service
 
 const challengeSchema = z.object({ email: z.string().email().max(320), uiLanguage: z.enum(['xh', 'en']).default('xh') }).strict();
 const verifySchema = z.object({ email: z.string().email().max(320), otp: z.string().regex(/^\d{6}$/) }).strict();
+const sessionIdParamsSchema = z.object({ id: z.string().min(1).max(128) }).strict();
 const correlationPattern = /^[A-Za-z0-9._:-]{1,128}$/;
 const baseResource: StoryResourceContext = { storytellerUserId: null, rightsHolderUserId: null, recorderUserId: null, actorStoryRoles: [], actorCircleRole: 'none', storyStatus: 'draft', deletionRequesterUserId: null, audience: 'private', hasApprovedVersion: false, translationApproved: false, activeConsentScopes: new Set(), hasValidBreakGlassGrant: false, assistedConsentSessionOpen: false, custodianAssistedConfirmationCurrent: false, firstStoryVersionApproved: false, adminReadOnlyProjection: true, adminDeletionApproved: false };
 
@@ -34,6 +38,16 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   const logger = createStructuredLogger('api');
   const allowedOrigins = new Set(options.allowedOrigins ?? ['http://localhost:3000']);
   const app = Fastify({ logger: false });
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
+  app.register(swagger, {
+    openapi: {
+      openapi: '3.1.0',
+      info: { title: 'Echoes of Home API', version: '1.0.0' },
+    },
+    transform: jsonSchemaTransform,
+  });
+  const api = app.withTypeProvider<ZodTypeProvider>();
   app.decorateRequest('session', null);
   app.decorateRequest('correlationId', '');
   app.register(cookie);
@@ -59,6 +73,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
     const statusCode = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
     if (statusCode === 429) return problem(reply, 429, 'rate_limited', correlationId);
     if (error instanceof AuthorizationError) return problem(reply, 403, 'forbidden', correlationId);
+    if (hasZodFastifySchemaValidationErrors(error)) return problem(reply, 400, 'validation_failed', correlationId, error.validation.map((issue) => ({ path: issue.instancePath, code: issue.keyword })));
     if (error instanceof z.ZodError) return problem(reply, 400, 'validation_failed', correlationId, error.issues.map((issue) => ({ path: issue.path.join('.'), code: issue.code })));
     const message = error instanceof Error ? error.message : '';
     if (message === 'unauthenticated') return problem(reply, 401, 'unauthenticated', correlationId);
@@ -69,14 +84,16 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
 
   // Explicit exemption: these endpoints are intentionally public by API contract.
   // They perform input validation and rate limiting, but have no actor to authorize.
-  app.post('/v1/auth/challenges', { config: { authorization: 'intentionally-public', rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => { const body = challengeSchema.parse(request.body); return reply.code(202).send(await auth.requestOtp(body.email, body.uiLanguage)); });
-  app.post('/v1/auth/challenges/verify', { config: { authorization: 'intentionally-public', rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => { const body = verifySchema.parse(request.body); const result = await auth.verifyOtp(body.email, body.otp); reply.setCookie('eoh_session', result.token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 30 * 86_400 }); return reply.send({ user: { id: result.session.userId, email: result.session.email }, session: { id: result.session.id, expiresAt: result.session.expiresAt.toISOString() } }); });
-  app.post('/v1/auth/logout', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); await auth.revokeSession(session.userId, session.id); reply.clearCookie('eoh_session', { path: '/' }); return reply.code(204).send(); });
-  app.get('/v1/me', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); return reply.send({ id: session.userId, email: session.email }); });
-  app.get('/v1/me/sessions', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); return reply.send({ data: await auth.listSessions(session.userId), nextCursor: null }); });
-  app.delete('/v1/me/sessions/:id', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); const id = (request.params as { id: string }).id; await auth.revokeSession(session.userId, id); return reply.code(204).send(); });
-  app.post('/v1/me/sessions/revoke-all', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); await auth.revokeAll(session.userId); reply.clearCookie('eoh_session', { path: '/' }); return reply.code(204).send(); });
-  app.get('/healthz', { config: { authorization: 'intentionally-public' } }, async (_request, reply) => reply.send({ ok: true }));
+  app.after(() => {
+  api.post('/v1/auth/challenges', { schema: { body: challengeSchema }, config: { authorization: 'intentionally-public', rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => { const body = challengeSchema.parse(request.body); return reply.code(202).send(await auth.requestOtp(body.email, body.uiLanguage)); });
+  api.post('/v1/auth/challenges/verify', { schema: { body: verifySchema }, config: { authorization: 'intentionally-public', rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => { const body = verifySchema.parse(request.body); const result = await auth.verifyOtp(body.email, body.otp); reply.setCookie('eoh_session', result.token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 30 * 86_400 }); return reply.send({ user: { id: result.session.userId, email: result.session.email }, session: { id: result.session.id, expiresAt: result.session.expiresAt.toISOString() } }); });
+  api.post('/v1/auth/logout', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); await auth.revokeSession(session.userId, session.id); reply.clearCookie('eoh_session', { path: '/' }); return reply.code(204).send(); });
+  api.get('/v1/me', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); return reply.send({ id: session.userId, email: session.email }); });
+  api.get('/v1/me/sessions', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); return reply.send({ data: await auth.listSessions(session.userId), nextCursor: null }); });
+  api.delete('/v1/me/sessions/:id', { schema: { params: sessionIdParamsSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); const id = (request.params as { id: string }).id; await auth.revokeSession(session.userId, id); return reply.code(204).send(); });
+  api.post('/v1/me/sessions/revoke-all', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); await auth.revokeAll(session.userId); reply.clearCookie('eoh_session', { path: '/' }); return reply.code(204).send(); });
+  api.get('/healthz', { config: { authorization: 'intentionally-public' } }, async (_request, reply) => reply.send({ ok: true }));
+  });
   return app;
 }
 
