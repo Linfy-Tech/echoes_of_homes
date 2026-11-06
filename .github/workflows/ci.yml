@@ -39,6 +39,8 @@ jobs:
           POSTGRES_TEST_URL: postgresql://echoes_test@localhost:5432/echoes_auth_test
       - name: Database migrations (Testcontainers PostgreSQL 16)
         run: pnpm test:database-migrations
+      - name: Audit chain writer and verifier (Testcontainers PostgreSQL 16)
+        run: pnpm test:audit-chain
       - name: Secret scan (full repository history)
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.0 git /repo --redact --exit-code 1
