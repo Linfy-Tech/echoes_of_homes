@@ -33,6 +33,8 @@ jobs:
       - run: pnpm lint
       - name: Config scaffold regression tests
         run: pnpm test
+      - name: Web translation catalogue parity
+        run: pnpm test:web-i18n
       - name: Authorization policy matrix
         run: pnpm test:policy
       - name: Auth storage compatibility (disposable PostgreSQL 16)

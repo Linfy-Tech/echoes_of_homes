@@ -17,6 +17,7 @@
     "test:policy": "pnpm --filter @echoes-of-home/auth test:policy",
     "test:api-routes": "pnpm --filter @echoes-of-home/api test:routes",
     "test:api-routes:postgres": "pnpm --filter @echoes-of-home/api test:routes:postgres",
+    "test:web-i18n": "pnpm --filter @echoes-of-home/web test:i18n",
     "test:database-migrations": "pnpm --filter @echoes-of-home/database test:migrations"
   },
   "devDependencies": {
