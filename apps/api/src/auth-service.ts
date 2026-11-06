@@ -84,7 +84,7 @@ export async function createBetterAuthService(options: { pool: Pool; authKeys: P
     secret: randomBytes(48).toString('base64url'),
     telemetry: { enabled: false },
     logger: { disabled: true },
-    session: { disableSessionRefresh: true },
+    session: { disableSessionRefresh: true, cookieCache: { enabled: false } },
     plugins: [emailOTP({
       otpLength: 6,
       expiresIn: 600,
@@ -97,14 +97,20 @@ export async function createBetterAuthService(options: { pool: Pool; authKeys: P
     async requestOtp(email, _uiLanguage) { await auth.api.sendVerificationOTP({ body: { email, type: 'sign-in' } }); return { challengeId: randomBytes(16).toString('hex'), expiresInSeconds: 600 }; },
     async verifyOtp(email, otp) {
       const result = await auth.api.signInEmailOTP({ body: { email, otp, name: 'Echoes of Home' }, returnHeaders: true });
-      const cookie = result.headers.getSetCookie().find((value: string) => value.startsWith('better-auth.session_token='));
-      if (!cookie) throw new Error('unauthenticated');
-      const token = cookie.slice('better-auth.session_token='.length).split(';', 1)[0] ?? '';
-      const current = await auth.api.getSession({ headers: new Headers({ cookie: `better-auth.session_token=${token}` }) });
+      const token = result.response.token;
+      if (typeof token !== 'string' || !token) throw new Error('unauthenticated');
+      const authCookie = result.headers.getSetCookie().find((value: string) => value.startsWith('better-auth.session_token='));
+      if (!authCookie) throw new Error('unauthenticated');
+      const authCookieValue = authCookie.slice('better-auth.session_token='.length).split(';', 1)[0] ?? '';
+      const current = await auth.api.getSession({ headers: new Headers({ cookie: `better-auth.session_token=${authCookieValue}` }) });
       if (!current) throw new Error('unauthenticated');
       return { token, session: { id: current.session.id, userId: current.user.id, email: current.user.email, expiresAt: new Date(current.session.expiresAt) } };
     },
-    async getSession(token) { const result = await auth.api.getSession({ headers: new Headers({ cookie: `better-auth.session_token=${token}` }) }); return result ? { id: result.session.id, userId: result.user.id, email: result.user.email, expiresAt: new Date(result.session.expiresAt) } : null; },
+    async getSession(token) {
+      const result = await options.pool.query<{ id: string; user_id: string; email: Buffer; expires_at: Date }>("SELECT s.id,s.user_id,u.email,s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now() AND s.last_seen_at>now()-interval '7 days' AND s.created_at+interval '30 days'>now() AND u.status='active'", [crypto.tokenHash(token)]);
+      const row = result.rows[0];
+      return row ? { id: row.id, userId: row.user_id, email: crypto.decrypt(row.email), expiresAt: row.expires_at } : null;
+    },
     async listSessions(userId) { const result = await options.pool.query<{ id: string; expires_at: Date }>('SELECT id, expires_at FROM sessions WHERE user_id=$1 AND revoked_at IS NULL AND expires_at>now() ORDER BY created_at DESC', [userId]); return result.rows.map((row) => ({ id: row.id, userId, email: delivered?.email ?? '', expiresAt: row.expires_at })); },
     async revokeSession(userId, sessionId) { await options.pool.query('UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND id=$2', [userId, sessionId]); },
     async revokeAll(userId) { await options.pool.query('UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [userId]); },

@@ -42,7 +42,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
     const supplied = request.headers['x-correlation-id'];
     request.correlationId = typeof supplied === 'string' && correlationPattern.test(supplied) ? supplied : randomUUID();
     reply.header('x-correlation-id', request.correlationId);
-    const token = request.cookies.eoh_session;
+    const token = request.cookies.eoh_session ?? request.headers.cookie?.split(';').map((part) => part.trim()).find((part) => part.startsWith('eoh_session='))?.slice('eoh_session='.length);
     if (token) request.session = await auth.getSession(token);
   });
   app.addHook('preHandler', async (request: RequestWithState, reply) => {

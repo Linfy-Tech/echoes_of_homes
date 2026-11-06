@@ -37,7 +37,7 @@ before(async () => {
       actor_type text NOT NULL, actor_user_id uuid, action text NOT NULL, entity_type text NOT NULL,
       entity_id uuid NOT NULL, story_id uuid, metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
       correlation_id text NOT NULL, prev_hash bytea NOT NULL, hash bytea NOT NULL
-    )`);
+    ); ALTER SEQUENCE audit_events_id_seq OWNED BY audit_events.id`);
   const audit = { key: randomBytes(32), context: () => ({ actorType: 'system', correlationId: 'api-integration-test' }) };
   const auth = await createBetterAuthService({ pool, authKeys: keys, audit, onOtp: (mail) => { delivered = mail; } });
   app = buildServer({ auth });
@@ -59,8 +59,9 @@ test('real Better Auth/Postgres OTP sign-in issues a session and serves /v1/me',
   assert.match(delivered.otp, /^\d{6}$/);
   const verify = await app.inject({ method: 'POST', url: '/v1/auth/challenges/verify', payload: { email, otp: delivered.otp } });
   assert.equal(verify.statusCode, 200);
-  const cookie = verify.headers['set-cookie'];
-  assert.ok(cookie?.startsWith('eoh_session='));
+  const setCookie = Array.isArray(verify.headers['set-cookie']) ? verify.headers['set-cookie'][0] : verify.headers['set-cookie'];
+  const cookie = setCookie?.split(';', 1)[0] ?? '';
+  assert.ok(cookie.startsWith('eoh_session='));
   const me = await app.inject({ method: 'GET', url: '/v1/me', headers: { cookie } });
   assert.equal(me.statusCode, 200);
   assert.equal(me.json().email, email);
