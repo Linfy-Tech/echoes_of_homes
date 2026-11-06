@@ -3,5 +3,8 @@
   "include": [
     "src/**/*"
   ],
-  "files": []
+  "files": [],
+  "compilerOptions": {
+    "allowImportingTsExtensions": true
+  }
 }

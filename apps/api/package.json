@@ -3,6 +3,24 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --build --pretty false"
+    "typecheck": "tsc --build --pretty false",
+    "test:routes": "node --experimental-strip-types --test test/routes.test.mjs",
+    "test:routes:postgres": "node --experimental-strip-types --test --test-timeout=30000 test/postgres-routes.test.mjs"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/csrf-protection": "^7.1.0",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@echoes-of-home/auth": "workspace:*",
+    "@echoes-of-home/database": "workspace:*",
+    "@echoes-of-home/validation": "workspace:*",
+    "fastify": "^5.6.1",
+    "pg": "^8.16.3",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.15.6"
   }
 }

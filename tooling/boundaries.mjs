@@ -21,6 +21,7 @@ const external = {
   validation: ['zod'],
   auth: ['better-auth', 'pg', 'uuid'],
   database: ['@testcontainers/postgresql', 'drizzle-orm', 'drizzle-kit', 'pg'],
+  api: ['fastify', '@fastify/cookie', '@fastify/csrf-protection', '@fastify/helmet', '@fastify/rate-limit', 'zod', 'pg', 'better-auth'],
 };
 const providers = /^(openai|cloudinary|@google-cloud\/[^/]+|@anthropic-ai\/[^/]+|@nebius\/[^/]+|@huggingface\/[^/]+|replicate|@aws-sdk\/[^/]+)(\/|$)/;
 

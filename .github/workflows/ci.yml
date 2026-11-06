@@ -39,6 +39,10 @@ jobs:
         run: pnpm test:auth-storage
         env:
           POSTGRES_TEST_URL: postgresql://echoes_test@localhost:5432/echoes_auth_test
+      - name: API Better Auth/Postgres OTP integration (PostgreSQL 16)
+        run: pnpm test:api-routes:postgres
+        env:
+          POSTGRES_API_TEST_URL: postgresql://echoes_test@localhost:5432/echoes_auth_test
       - name: Database migrations (Testcontainers PostgreSQL 16)
         run: pnpm test:database-migrations
       - name: Audit chain writer and verifier (Testcontainers PostgreSQL 16)
