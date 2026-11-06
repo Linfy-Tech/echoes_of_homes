@@ -7,14 +7,14 @@
     "typecheck": "tsc --build --pretty false"
   },
   "dependencies": {
-    "@opentelemetry/api": "1.9.0",
-    "@opentelemetry/api-logs": "0.208.0",
-    "@opentelemetry/exporter-logs-otlp-proto": "0.208.0",
-    "@opentelemetry/exporter-metrics-otlp-proto": "0.208.0",
-    "@opentelemetry/exporter-trace-otlp-proto": "0.208.0",
-    "@opentelemetry/resources": "2.0.1",
-    "@opentelemetry/sdk-logs": "0.208.0",
-    "@opentelemetry/sdk-metrics": "2.0.1",
+    "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/api-logs": "0.223.0",
+    "@opentelemetry/exporter-logs-otlp-proto": "0.301.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "0.301.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "0.301.0",
+    "@opentelemetry/resources": "3.1.0",
+    "@opentelemetry/sdk-logs": "3.1.0",
+    "@opentelemetry/sdk-metrics": "3.1.0",
     "@opentelemetry/sdk-node": "0.301.0"
   },
   "exports": {
