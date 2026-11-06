@@ -52,3 +52,13 @@ jobs:
       - name: Secret scan (full repository history)
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.0 git /repo --redact --exit-code 1
+      - name: Install Railway CLI for IaC plan
+        if: ${{ secrets.RAILWAY_TOKEN != '' }}
+        continue-on-error: true
+        run: npm install --global @railway/cli@5.71.0
+      - name: Run Railway staging IaC plan
+        if: ${{ secrets.RAILWAY_TOKEN != '' }}
+        continue-on-error: true
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway config plan --file .railway/railway.ts --environment staging --json
