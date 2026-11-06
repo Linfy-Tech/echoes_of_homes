@@ -5,6 +5,8 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
     services:
       postgres:
         image: postgres:16
@@ -52,3 +54,11 @@ jobs:
       - name: Secret scan (full repository history)
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.0 git /repo --redact --exit-code 1
+      - name: Install Railway CLI for IaC plan
+        if: ${{ env.RAILWAY_TOKEN != '' }}
+        continue-on-error: true
+        run: npm install --global @railway/cli@5.71.0
+      - name: Run Railway staging IaC plan
+        if: ${{ env.RAILWAY_TOKEN != '' }}
+        continue-on-error: true
+        run: railway config plan --file .railway/railway.ts --environment staging --json
