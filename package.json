@@ -7,10 +7,13 @@
     "node": ">=24.15.0 <25"
   },
   "scripts": {
+    "db:generate": "pnpm --filter @echoes-of-home/database db:generate",
+    "db:migrate": "pnpm --filter @echoes-of-home/database db:migrate",
     "typecheck": "turbo run typecheck",
     "lint": "eslint . --no-inline-config --max-warnings 0 && node --test tests/unit/boundaries.test.mjs",
     "test": "node --test tests/unit/*.test.mjs",
-    "test:auth-storage": "node --test --test-timeout=30000 packages/auth/test/storage.test.mjs"
+    "test:auth-storage": "node --test --test-timeout=30000 packages/auth/test/storage.test.mjs",
+    "test:database-migrations": "pnpm --filter @echoes-of-home/database test:migrations"
   },
   "devDependencies": {
     "eslint": "10.14.0",

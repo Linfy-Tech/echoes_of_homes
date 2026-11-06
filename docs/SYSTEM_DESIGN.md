@@ -87,7 +87,7 @@ Every task runs inside `runJob(type, handler)`:
 - `model_runs` are written even for failed calls (cost and audit).
 
 ### 4.4 Scheduling and maintenance
-Graphile Worker cron-style tasks: `maintenance.abandon_uploads` (hourly), `deletion.scan_due` (every 15 min — promotes due `requested` deletions), `export.expire` (hourly), `maintenance.ledger_replicate` (every 15 min), `maintenance.purge_ephemeral` (daily: auth challenges, idempotency keys, webhook receipts > 30 days), `maintenance.audit_chain_verify` (daily).
+Graphile Worker cron-style tasks: `maintenance.abandon_uploads` (hourly), `deletion.scan_due` (every 15 min — promotes due `requested` deletions), `export.expire` (hourly), `maintenance.ledger_replicate` (every 15 min), `maintenance.purge_ephemeral` (daily: auth challenges and idempotency keys older than 24 h; webhook receipts older than 30 days), `maintenance.audit_chain_verify` (daily).
 
 ## 5. Audio pipeline (Listener)
 
