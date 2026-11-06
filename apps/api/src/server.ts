@@ -6,6 +6,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import { z } from 'zod';
 import { assertCan, AuthorizationError, type Actor, type StoryResourceContext } from '@echoes-of-home/auth/policy';
+import { createStructuredLogger, startObservability } from '@echoes-of-home/observability';
 import { LocalAuthService, type AuthService, type Session } from './auth-service.ts';
 
 const challengeSchema = z.object({ email: z.string().email().max(320), uiLanguage: z.enum(['xh', 'en']).default('xh') }).strict();
@@ -30,6 +31,7 @@ function assertRoutePolicy(session: Session, action: Parameters<typeof assertCan
 
 export function buildServer(options: { auth?: AuthService; allowedOrigins?: readonly string[] } = {}): FastifyInstance {
   const auth = options.auth ?? new LocalAuthService();
+  const logger = createStructuredLogger('api');
   const allowedOrigins = new Set(options.allowedOrigins ?? ['http://localhost:3000']);
   const app = Fastify({ logger: false });
   app.decorateRequest('session', null);
@@ -61,7 +63,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
     const message = error instanceof Error ? error.message : '';
     if (message === 'unauthenticated') return problem(reply, 401, 'unauthenticated', correlationId);
     if (message === 'validation_failed') return problem(reply, 400, 'validation_failed', correlationId);
-    request.log.error({ err: error, correlationId }, 'request failed');
+    logger.error('request.failed', { correlationId, route: request.url.split('?')[0], status: 500, errorCode: 'internal_error' });
     return problem(reply, 500, 'internal_error', correlationId);
   });
 
@@ -78,4 +80,17 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   return app;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) buildServer().listen({ port: Number(process.env.PORT ?? 4000), host: '0.0.0.0' }).catch(() => process.exitCode = 1);
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const telemetry = await startObservability({ serviceName: 'api' });
+  const app = buildServer();
+  const shutdown = async (): Promise<void> => {
+    await app.close();
+    await telemetry.shutdown();
+    process.exit(0);
+  };
+  process.once('SIGTERM', () => { void shutdown(); });
+  process.once('SIGINT', () => { void shutdown(); });
+  app.listen({ port: Number(process.env.PORT ?? 4000), host: '0.0.0.0' })
+    .then(() => createStructuredLogger('api').info('api.started', { service: 'api', success: true }))
+    .catch(() => { process.exitCode = 1; void telemetry.shutdown(); });
+}

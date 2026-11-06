@@ -154,7 +154,7 @@ Browser requests `GET /v1/stories/{id}/audio?rendition=playback` with `Range`. A
 | AI | Provider abstraction; models selected by benchmark | Accepted (abstraction); models open | ADR-005 |
 | Orchestration | Deterministic pipeline; Agents SDK not used in R1 | Proposed | ADR-006 |
 | Auth | Better Auth + email-OTP plugin; server-side sessions in Postgres; preserve email link/code requirements | Selected by founder; restricted storage adapter verified (OQ-039) | ADR-010 |
-| Observability | OpenTelemetry SDK → OTLP backend (vendor OQ-013), structured JSON logs | Proposed | — |
+| Observability | OpenTelemetry SDK → Grafana Cloud EU via OTLP, structured JSON logs with fail-closed redaction | Selected (OQ-013) | — |
 | Monorepo | pnpm workspaces + Turborepo | Proposed | — |
 | Testing | Vitest, Playwright, axe-core, Testcontainers (Postgres) | Proposed | — |
 
