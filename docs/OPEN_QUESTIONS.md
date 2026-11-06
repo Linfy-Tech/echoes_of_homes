@@ -45,7 +45,7 @@ Legend — **Owner:** F = founder/product owner, E = engineering, L = legal coun
 | OQ-010 | Does `destroy` remove eager derivatives? What remains after deleting backup versions of a reserved public ID **[S10]**? | Explicit derived + backup deletion regardless; confirm with support | E | M0 | Open |
 | OQ-011 | Phone/WhatsApp OTP sign-in: cost, SIM-swap risk, provider | Defer to R3 | F/E | R3 | Deferred |
 | OQ-012 | Auth library, email-OTP flow, and session store | Founder selected Better Auth + email-OTP plugin + Postgres sessions on 2026-11-05; see ADR-010. Storage compatibility resolved in OQ-039; live email vendor is OQ-040 | F/E | M1 | Resolved (selection) |
-| OQ-013 | Observability and error-reporting vendor (must support PII scrubbing; region) | Compare Grafana Cloud and Better Stack via OTLP (options below); founder decides | E | M1 | Open |
+| OQ-013 | Observability and error-reporting vendor (must support PII scrubbing; region) | Resolved 2026-11-06: Grafana Cloud free tier, EU stack, via direct OTLP for traces, metrics, and logs. Endpoint, instance ID, and API key are supplied only through environment variables; application-side allow-list redaction remains mandatory | E | M1 | Resolved |
 | OQ-016 | Incremental SHA-256 library for browser (licence, performance on low-end Android) | Evaluate WASM options in M3 | E | M3 | Open |
 | OQ-017 | Shared rate-limit store before scaling API beyond one replica | Postgres-backed limiter | E | R4 | Deferred |
 | OQ-024 | Should named private viewers require `share_family` scope or a separate scope? | Require `share_family` in R1 | F/L | M7 | Open |
@@ -71,7 +71,7 @@ Legend — **Owner:** F = founder/product owner, E = engineering, L = legal coun
 
 ## M1 auth decision and remaining proposals
 
-Better Auth is selected by the founder and its pinned dependency is installed locally; no paid resource has been provisioned. OQ-039 is resolved for the documented restricted adapter; OQ-013 and OQ-040 remain open.
+Better Auth is selected by the founder and its pinned dependency is installed locally; no paid resource has been provisioned. OQ-039 is resolved for the documented restricted adapter; OQ-040 remains open.
 
 - **OQ-012 (selection resolved):** Better Auth + email-OTP plugin, with server-side sessions in Postgres. Version 1.7.17's MIT licence and Postgres support were verified before coding; its standard persistence contract is not a direct match for our schema. ADR-010 records the evidence and proposed compatibility slice (OQ-039). Custom storage integration is now verified for the documented subset; Fastify is not required for these tests. Email delivery vendor selection is tracked separately as OQ-040.
-- **OQ-013:** [Grafana Cloud via OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/) offers a unified telemetry backend but needs retention/cardinality controls. [Better Stack via OpenTelemetry](https://betterstack.com/docs/logs/open-telemetry/) is another hosted ingestion option but needs a metric/trace coverage and cost review. Recommend comparing both using synthetic, content-free telemetry; confirm region, DPA, redaction, retention, and costs before selection. Application-side field allow-lists remain mandatory regardless of vendor.
+- **OQ-013 (resolved):** [Grafana Cloud free tier via OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/) is selected for an EU-region stack, keeping the planned residency/DPA posture aligned with Railway Amsterdam and the existing EU Cloudinary choice. The application sends only allow-listed, content-free telemetry; credentials are environment variables and real Grafana credentials are not committed.

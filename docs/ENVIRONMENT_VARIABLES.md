@@ -57,7 +57,9 @@ Template: `/.env.example` (placeholders only). All variables are validated at pr
 | `RATE_LIMIT_API_PER_MIN` | A | | no | Default 120 |
 | `RATE_LIMIT_UPLOAD_SIGN_PER_HOUR` | A | | no | Default 60 |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | A K C | | prod | |
-| `OTEL_EXPORTER_OTLP_HEADERS` | A K C | 🔐 | prod | Vendor auth header |
+| `GRAFANA_CLOUD_OTLP_INSTANCE_ID` | A K C | 🔐 | prod | Grafana Cloud OTLP instance ID |
+| `GRAFANA_CLOUD_OTLP_API_KEY` | A K C | 🔐 | prod | Grafana Cloud OTLP token; never commit |
+| `OTEL_SERVICE_NAME` | A K C | | prod | `api` or `story-processing` |
 | `ERROR_REPORTING_DSN` | W A K | 🔐* | prod | *DSNs for browsers are semi-public; scrubbing mandatory |
 | `DELETION_LEDGER_S3_ENDPOINT`, `_BUCKET` | K | | prod | Offsite ledger |
 | `DELETION_LEDGER_S3_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY` | K | 🔐 | prod | Write-only credentials where possible |
