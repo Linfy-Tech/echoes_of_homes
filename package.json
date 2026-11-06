@@ -14,6 +14,7 @@
     "test": "node --test tests/unit/*.test.mjs",
     "test:auth-storage": "node --test --test-timeout=30000 packages/auth/test/storage.test.mjs",
     "test:audit-chain": "pnpm --filter @echoes-of-home/database test:audit-chain",
+    "test:observability": "pnpm --filter @echoes-of-home/observability test",
     "test:policy": "pnpm --filter @echoes-of-home/auth test:policy",
     "test:api-routes": "pnpm --filter @echoes-of-home/api test:routes",
     "test:api-routes:postgres": "pnpm --filter @echoes-of-home/api test:routes:postgres",

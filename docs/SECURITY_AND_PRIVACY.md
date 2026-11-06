@@ -79,7 +79,7 @@ Railway has no Africa region **[VERIFIED S12]**; every data flow leaves South Af
 | Nebius Token Factory (if selected) | Transcript/translation text | Public endpoints "Global" (location can change); dedicated endpoints regional **[VERIFIED S16]** | Without ZDR, inputs/outputs retained (stored in Finland) for speculative decoding; ZDR org-wide; no training **[VERIFIED S16]** | Enable ZDR; prefer dedicated endpoint for production |
 | Self-hosted ASR (if selected) | Audio chunks | Region of GPU host | Our control | Host TBD |
 | Email provider | Email addresses, content-free notifications | TBD (OQ-012) | Provider policy | — |
-| Observability vendor | Content-free telemetry | TBD (OQ-013) | Provider policy | — |
+| Observability vendor | Content-free telemetry | Grafana Cloud EU via OTLP (OQ-013 resolved) | Provider policy; application-side redaction remains mandatory | Selected |
 
 POPIA s72(1) permits transfers if (a) the recipient is subject to law/binding rules/agreement providing adequate protection, (b) the data subject consents, (c)/(d) contract necessity, or (e) benefit where consent is impracticable **[VERIFIED S26]**. **RECOMMENDATION:** rely on (a) via DPAs/adequate jurisdictions **and** obtain explicit `cross_border_processing` consent (b) as a second basis, with the processor list shown in the consent explanation. **LEGAL REVIEW** (OQ-014).
 

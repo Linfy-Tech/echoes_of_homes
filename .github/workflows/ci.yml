@@ -51,6 +51,8 @@ jobs:
         run: pnpm test:database-migrations
       - name: Audit chain writer and verifier (Testcontainers PostgreSQL 16)
         run: pnpm test:audit-chain
+      - name: Observability redaction tests
+        run: pnpm test:observability
       - name: Secret scan (full repository history)
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.0 git /repo --redact --exit-code 1

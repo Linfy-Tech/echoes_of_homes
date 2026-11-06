@@ -14,6 +14,7 @@
     "@fastify/rate-limit": "^10.3.0",
     "@echoes-of-home/auth": "workspace:*",
     "@echoes-of-home/database": "workspace:*",
+    "@echoes-of-home/observability": "workspace:*",
     "@echoes-of-home/validation": "workspace:*",
     "better-auth": "1.7.16",
     "fastify": "^5.6.1",

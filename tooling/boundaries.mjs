@@ -5,8 +5,8 @@ const scope = '@echoes-of-home/';
 // Workspace import rules follow docs/ARCHITECTURE.md section 4.
 const allowed = {
   web: ['shared-types', 'validation'],
-  api: ['shared-types', 'validation', 'auth', 'database', 'media-storage', 'agent-workflows'],
-  'story-processing': ['shared-types', 'validation', 'auth', 'database', 'media-storage', 'ai-providers', 'agent-workflows'],
+  api: ['shared-types', 'validation', 'auth', 'database', 'media-storage', 'agent-workflows', 'observability'],
+  'story-processing': ['shared-types', 'validation', 'auth', 'database', 'media-storage', 'ai-providers', 'agent-workflows', 'observability'],
   'shared-types': [],
   validation: ['shared-types'],
   auth: ['shared-types', 'validation', 'database'],
@@ -14,6 +14,7 @@ const allowed = {
   'ai-providers': ['shared-types', 'validation'],
   'media-storage': ['shared-types', 'validation'],
   'agent-workflows': ['shared-types', 'validation', 'ai-providers'],
+  observability: [],
 };
 const owner = (file) => /^(?:apps|packages|workers)\/([^/]+)(?:\/|$)/.exec(file)?.[1];
 // New external dependencies require an explicit boundary review in their slice.
@@ -22,6 +23,7 @@ const external = {
   auth: ['better-auth', 'pg', 'uuid'],
   database: ['@testcontainers/postgresql', 'drizzle-orm', 'drizzle-kit', 'pg'],
   api: ['fastify', '@fastify/cookie', '@fastify/csrf-protection', '@fastify/helmet', '@fastify/rate-limit', 'zod', 'pg', 'better-auth'],
+  observability: ['@opentelemetry/api', '@opentelemetry/api-logs', '@opentelemetry/exporter-logs-otlp-proto', '@opentelemetry/exporter-metrics-otlp-proto', '@opentelemetry/exporter-trace-otlp-proto', '@opentelemetry/resources', '@opentelemetry/sdk-logs', '@opentelemetry/sdk-metrics', '@opentelemetry/sdk-node'],
   web: ['next', 'react', 'react-dom'],
 };
 const providers = /^(openai|cloudinary|@google-cloud\/[^/]+|@anthropic-ai\/[^/]+|@nebius\/[^/]+|@huggingface\/[^/]+|replicate|@aws-sdk\/[^/]+)(\/|$)/;
