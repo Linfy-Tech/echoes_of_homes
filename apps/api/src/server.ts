@@ -54,7 +54,8 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   });
   app.setErrorHandler((error, request, reply) => {
     const correlationId = (request as RequestWithState).correlationId ?? 'unknown';
-    if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 429) return problem(reply, 429, 'rate_limited', correlationId);
+    const statusCode = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
+    if (statusCode === 429) return problem(reply, 429, 'rate_limited', correlationId);
     if (error instanceof AuthorizationError) return problem(reply, 403, 'forbidden', correlationId);
     if (error instanceof z.ZodError) return problem(reply, 400, 'validation_failed', correlationId, error.issues.map((issue) => ({ path: issue.path.join('.'), code: issue.code })));
     if (error.message === 'unauthenticated') return problem(reply, 401, 'unauthenticated', correlationId);

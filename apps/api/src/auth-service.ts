@@ -97,7 +97,7 @@ export async function createBetterAuthService(options: { pool: Pool; authKeys: P
     async requestOtp(email, _uiLanguage) { await auth.api.sendVerificationOTP({ body: { email, type: 'sign-in' } }); return { challengeId: randomBytes(16).toString('hex'), expiresInSeconds: 600 }; },
     async verifyOtp(email, otp) {
       const result = await auth.api.signInEmailOTP({ body: { email, otp, name: 'Echoes of Home' }, returnHeaders: true });
-      const cookie = result.headers.getSetCookie().find((value) => value.startsWith('better-auth.session_token='));
+      const cookie = result.headers.getSetCookie().find((value: string) => value.startsWith('better-auth.session_token='));
       if (!cookie) throw new Error('unauthenticated');
       const token = cookie.slice('better-auth.session_token='.length).split(';', 1)[0] ?? '';
       const current = await auth.api.getSession({ headers: new Headers({ cookie: `better-auth.session_token=${token}` }) });
