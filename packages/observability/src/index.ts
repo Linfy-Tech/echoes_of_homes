@@ -161,11 +161,11 @@ export async function startObservability(options: ObservabilityOptions): Promise
   const sdk = new NodeSDK({
     resource,
     traceExporter: new OTLPTraceExporter({ url: signalEndpoint(endpoint, 'traces'), headers }),
-    metricReader: new PeriodicExportingMetricReader({ exporter: new OTLPMetricExporter({ url: signalEndpoint(endpoint, 'metrics'), headers }), exportIntervalMillis: 60_000 }),
+    metricReaders: [new PeriodicExportingMetricReader({ exporter: new OTLPMetricExporter({ url: signalEndpoint(endpoint, 'metrics'), headers }), exportIntervalMillis: 60_000 })],
   });
   const loggerProvider = new LoggerProvider({
     resource,
-    processors: [new BatchLogRecordProcessor(new OTLPLogExporter({ url: signalEndpoint(endpoint, 'logs'), headers }))],
+    processors: [new BatchLogRecordProcessor({ exporter: new OTLPLogExporter({ url: signalEndpoint(endpoint, 'logs'), headers }) })],
   });
   logs.setGlobalLoggerProvider(loggerProvider);
   await Promise.resolve(sdk.start());
