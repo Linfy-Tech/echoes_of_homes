@@ -9,7 +9,7 @@ All examples use **illustrative data only** (fictional IDs and names).
 ## 1. Conventions
 
 ### 1.1 Authentication
-- Session cookie `eoh_session` (`HttpOnly; Secure; SameSite=Lax; Path=/`). Opaque token; server-side lookup.
+- Session cookie `eoh_session` (`HttpOnly; Secure; SameSite=Lax; Path=/`). Opaque token; server-side lookup uses HMAC-SHA256(pepper, token) per DATA_MODEL.md §3.
 - State-changing requests (`POST/PUT/PATCH/DELETE`) require: valid session, `Origin` header in `ALLOWED_ORIGINS`, and header `X-Requested-With: eoh-web` (CSRF defence in depth).
 - No bearer tokens for end users in R1. Webhooks authenticate by provider signature.
 

@@ -4,5 +4,18 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --build --pretty false"
+  },
+  "dependencies": {
+    "better-auth": "1.7.16",
+    "pg": "8.16.3",
+    "uuid": "13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "@types/pg": "8.15.6"
+  },
+  "exports": {
+    "./postgres-adapter": "./src/postgres-adapter.ts",
+    "./credentials": "./src/crypto.ts"
   }
 }

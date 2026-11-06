@@ -10,6 +10,8 @@
 4. Any transition not listed here is forbidden and must be rejected with `409 invalid_state_transition`.
 5. Workers perform transitions as the `system` actor, which has only the transitions explicitly marked **system** below.
 
+Session authentication uses HMAC-SHA256(pepper, token) per `DATA_MODEL.md` §3; this digest refinement changes no lifecycle transitions.
+
 Notation: `from → to` · **actor** · *guard* · ⇒ side effects.
 
 Actor names: "reviewer" = a User with story role `transcript_reviewer`; "translation reviewer" = story role `translation_reviewer`; "rights holder" = the User who is the story's current rights holder (storyteller with account, or active custodian) and who implicitly holds both reviewer capabilities; "storyteller" = the storyteller's own User account, or an assisted consent session (`CONSENT_AND_OWNERSHIP.md` §3). Role definitions: `CONSENT_AND_OWNERSHIP.md` §5.

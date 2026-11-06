@@ -5,6 +5,18 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: echoes_test
+          POSTGRES_DB: echoes_auth_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U echoes_test -d echoes_auth_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,6 +33,10 @@ jobs:
       - run: pnpm lint
       - name: Config scaffold regression tests
         run: pnpm test
+      - name: Auth storage compatibility (disposable PostgreSQL 16)
+        run: pnpm test:auth-storage
+        env:
+          POSTGRES_TEST_URL: postgresql://echoes_test@localhost:5432/echoes_auth_test
       - name: Secret scan (full repository history)
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.0 git /repo --redact --exit-code 1
