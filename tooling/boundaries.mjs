@@ -22,7 +22,7 @@ const external = {
   validation: ['zod'],
   auth: ['better-auth', 'pg', 'uuid'],
   database: ['@testcontainers/postgresql', 'drizzle-orm', 'drizzle-kit', 'pg'],
-  api: ['fastify', '@fastify/cookie', '@fastify/csrf-protection', '@fastify/helmet', '@fastify/rate-limit', 'zod', 'pg', 'better-auth'],
+  api: ['fastify', '@fastify/cookie', '@fastify/csrf-protection', '@fastify/helmet', '@fastify/rate-limit', '@fastify/swagger', '@fastify/type-provider-zod', 'zod', 'pg', 'better-auth'],
   observability: ['@opentelemetry/api', '@opentelemetry/api-logs', '@opentelemetry/exporter-logs-otlp-proto', '@opentelemetry/exporter-metrics-otlp-proto', '@opentelemetry/exporter-trace-otlp-proto', '@opentelemetry/resources', '@opentelemetry/sdk-logs', '@opentelemetry/sdk-metrics', '@opentelemetry/sdk-node'],
   web: ['next', 'react', 'react-dom'],
 };

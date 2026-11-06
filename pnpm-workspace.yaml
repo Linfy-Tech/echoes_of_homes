@@ -8,3 +8,8 @@ allowBuilds:
   cpu-features: false
   protobufjs: false
   ssh2: false
+overrides:
+  '@opentelemetry/propagator-jaeger': 2.12.0
+  postcss: 8.5.32
+  protobufjs: 8.8.1
+  sharp: 0.35.5
