@@ -4,5 +4,11 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --build --pretty false"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0"
   }
 }
