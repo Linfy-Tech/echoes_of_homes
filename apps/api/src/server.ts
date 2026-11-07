@@ -11,11 +11,20 @@ import { z } from 'zod';
 import { assertCan, AuthorizationError, type Actor, type StoryResourceContext } from '@echoes-of-home/auth/policy';
 import { createStructuredLogger, startObservability } from '@echoes-of-home/observability';
 import { LocalAuthService, type AuthService, type Session } from './auth-service.ts';
+import { createDrizzleM2FoundationService, M2FoundationService } from './m2-foundation.ts';
+import { Pool } from 'pg';
 
 const challengeSchema = z.object({ email: z.string().email().max(320), uiLanguage: z.enum(['xh', 'en']).default('xh') }).strict();
 const verifySchema = z.object({ email: z.string().email().max(320), otp: z.string().regex(/^\d{6}$/) }).strict();
 const sessionIdParamsSchema = z.object({ id: z.string().min(1).max(128) }).strict();
 const correlationPattern = /^[A-Za-z0-9._:-]{1,128}$/;
+const familySchema = z.object({ name: z.string().trim().min(1).max(80) }).strict();
+const personSchema = z.object({ displayName: z.string().trim().min(1).max(80), preferredLanguage: z.enum(['xh', 'en']).default('xh') }).strict();
+const storySchema = z.object({ familyCircleId: z.string().uuid(), storytellerPersonId: z.string().uuid(), title: z.string().trim().max(200).optional() }).strict();
+const invitationSchema = z.object({ type: z.enum(['family_member', 'custodian', 'storyteller_account_link']), invitedEmail: z.string().email().max(320), familyCircleId: z.string().uuid().optional(), storyId: z.string().uuid().optional(), personId: z.string().uuid().optional() }).strict();
+const consentSchema = z.object({ method: z.enum(['self_digital', 'assisted_verbal']), evidenceMediaAssetId: z.string().uuid().nullable().default(null), comprehensionResult: z.object({ questions: z.literal(3), correct: z.number().int().min(0).max(3), reexplained: z.boolean() }).strict(), rightsHolderChoice: z.enum(['self', 'custodian']), scopes: z.record(z.string(), z.boolean()) }).strict();
+const custodianSchema = z.object({ custodianEmail: z.string().email().max(320), custodianPersonId: z.string().uuid(), consentRecordId: z.string().uuid() }).strict();
+const storyRoleSchema = z.object({ userId: z.string().min(1), role: z.enum(['recorder', 'transcript_reviewer', 'translation_reviewer', 'viewer']) }).strict();
 const baseResource: StoryResourceContext = { storytellerUserId: null, rightsHolderUserId: null, recorderUserId: null, actorStoryRoles: [], actorCircleRole: 'none', storyStatus: 'draft', deletionRequesterUserId: null, audience: 'private', hasApprovedVersion: false, translationApproved: false, activeConsentScopes: new Set(), hasValidBreakGlassGrant: false, assistedConsentSessionOpen: false, custodianAssistedConfirmationCurrent: false, firstStoryVersionApproved: false, adminReadOnlyProjection: true, adminDeletionApproved: false };
 
 type RequestWithState = FastifyRequest & { session?: Session | null; correlationId?: string };
@@ -33,8 +42,9 @@ function requireSession(request: RequestWithState, reply: FastifyReply): Session
 
 function assertRoutePolicy(session: Session, action: Parameters<typeof assertCan>[1]): void { assertCan(actorFor(session), action, resourceFor(session)); }
 
-export function buildServer(options: { auth?: AuthService; allowedOrigins?: readonly string[] } = {}): FastifyInstance {
+export function buildServer(options: { auth?: AuthService; allowedOrigins?: readonly string[]; foundation?: M2FoundationService } = {}): FastifyInstance {
   const auth = options.auth ?? new LocalAuthService();
+  const foundation = options.foundation ?? new M2FoundationService();
   const logger = createStructuredLogger('api');
   const allowedOrigins = new Set(options.allowedOrigins ?? ['http://localhost:3000']);
   const app = Fastify({ logger: false });
@@ -78,6 +88,9 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
     const message = error instanceof Error ? error.message : '';
     if (message === 'unauthenticated') return problem(reply, 401, 'unauthenticated', correlationId);
     if (message === 'validation_failed') return problem(reply, 400, 'validation_failed', correlationId);
+    if (message === 'not_found') return problem(reply, 404, 'not_found', correlationId);
+    if (message === 'placeholder_consent_script_forbidden') return problem(reply, 409, 'placeholder_consent_script_forbidden', correlationId);
+    if (message === 'authorization_denied') return problem(reply, 403, 'forbidden', correlationId);
     logger.error('request.failed', { correlationId, route: request.url.split('?')[0], status: 500, errorCode: 'internal_error' });
     return problem(reply, 500, 'internal_error', correlationId);
   });
@@ -92,6 +105,24 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   api.get('/v1/me/sessions', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); return reply.send({ data: await auth.listSessions(session.userId), nextCursor: null }); });
   api.delete('/v1/me/sessions/:id', { schema: { params: sessionIdParamsSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); const id = (request.params as { id: string }).id; await auth.revokeSession(session.userId, id); return reply.code(204).send(); });
   api.post('/v1/me/sessions/revoke-all', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertRoutePolicy(session, 'story.read'); await auth.revokeAll(session.userId); reply.clearCookie('eoh_session', { path: '/' }); return reply.code(204).send(); });
+  type M2ResourceOverrides = Partial<StoryResourceContext> & { storyId?: string; familyCircleId?: string };
+  const m2Resource = async (session: Session, overrides: M2ResourceOverrides = {}) => {
+    const storyId = (overrides as Partial<{ storyId: string }>).storyId;
+    const familyCircleId = (overrides as Partial<{ familyCircleId: string }>).familyCircleId;
+    const storyContext = storyId ? await foundation.storyResource(session.userId, storyId) : {};
+    return { ...resourceFor(session), storytellerUserId: null, rightsHolderUserId: null, recorderUserId: null, actorCircleRole: familyCircleId ? await foundation.circleRole(session.userId, familyCircleId) : 'none' as const, ...storyContext, ...overrides };
+  };
+  api.post('/v1/families', { schema: { body: familySchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertCan(actorFor(session), 'family.create', await m2Resource(session)); const family = await foundation.createFamily(session.userId, familySchema.parse(request.body).name); return reply.code(201).send(family); });
+  api.get('/v1/families', async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const families = await foundation.listFamilies(session.userId); assertCan(actorFor(session), 'family.read', await m2Resource(session, { familyCircleId: families[0]?.id })); return reply.send({ data: families }); });
+  api.post('/v1/persons', { schema: { body: personSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; assertCan(actorFor(session), 'person.create', await m2Resource(session, { personCreatorUserId: session.userId })); return reply.code(201).send(await foundation.createPerson(session.userId, personSchema.parse(request.body))); });
+  api.post('/v1/stories', { schema: { body: storySchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const body = storySchema.parse(request.body); assertCan(actorFor(session), 'story.create', await m2Resource(session, { familyCircleId: body.familyCircleId, recorderUserId: session.userId })); return reply.code(201).send(await foundation.createStory(session.userId, body)); });
+  api.get('/v1/stories/:id', { schema: { params: z.object({ id: z.string().uuid() }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const story = await foundation.getStory(id); if (!story) throw new Error('not_found'); assertCan(actorFor(session), 'story.read', await m2Resource(session, { storyId: id })); return reply.send(story); });
+  api.post('/v1/invitations', { schema: { body: invitationSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const body = invitationSchema.parse(request.body); assertCan(actorFor(session), 'family.invite', await m2Resource(session, { familyCircleId: body.familyCircleId })); return reply.code(201).send(await foundation.invite(session.userId, body)); });
+  api.post('/v1/stories/:id/custodian-designation', { schema: { params: z.object({ id: z.string().uuid() }), body: custodianSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const body = custodianSchema.parse(request.body); if (!await foundation.hasConsent(body.consentRecordId)) throw new Error('not_found'); assertCan(actorFor(session), 'custodian.designate', await m2Resource(session, { storyId: id })); return reply.code(201).send(await foundation.invite(session.userId, { type: 'custodian', invitedEmail: body.custodianEmail, storyId: id, personId: body.custodianPersonId })); });
+  api.post('/v1/invitations/:id/accept', { schema: { params: z.object({ id: z.string().uuid() }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const invitation = await foundation.getInvitation(id); if (!invitation) throw new Error('not_found'); assertCan(actorFor(session), 'invitation.accept', await m2Resource(session, { invitationRecipientUserId: session.userId })); return reply.send(await foundation.acceptInvitation(id, session.userId)); });
+  api.post('/v1/stories/:id/consent', { schema: { params: z.object({ id: z.string().uuid() }), body: consentSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const body = consentSchema.parse(request.body); assertCan(actorFor(session), 'consent.create', await m2Resource(session, { storyId: id, assistedConsentSessionOpen: body.method === 'assisted_verbal' })); return reply.code(201).send(await foundation.recordConsent(id, body, session.userId)); });
+  api.post('/v1/stories/:id/consent/withdraw', { schema: { params: z.object({ id: z.string().uuid() }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; assertCan(actorFor(session), 'consent.withdraw', await m2Resource(session, { storyId: id })); return reply.send(await foundation.withdrawConsent(id, session.userId)); });
+  api.post('/v1/stories/:id/roles', { schema: { params: z.object({ id: z.string().uuid() }), body: storyRoleSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; if (!await foundation.getStory(id)) throw new Error('not_found'); assertCan(actorFor(session), 'story.role.manage', await m2Resource(session, { storyId: id })); const body = storyRoleSchema.parse(request.body); return reply.code(201).send(await foundation.grantRole(id, body.userId, body.role, session.userId)); });
   api.get('/healthz', { config: { authorization: 'intentionally-public' } }, async (_request, reply) => reply.send({ ok: true }));
   });
   return app;
@@ -99,9 +130,16 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const telemetry = await startObservability({ serviceName: 'api' });
-  const app = buildServer();
+  const dbPool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
+  const auditKey = process.env.AUDIT_HMAC_KEY ? Buffer.from(process.env.AUDIT_HMAC_KEY, 'base64') : null;
+  let fieldKey: Buffer | null = null;
+  try { const keyring = process.env.FIELD_ENCRYPTION_KEYS ? JSON.parse(process.env.FIELD_ENCRYPTION_KEYS) as Record<string, string> : null; const currentId = process.env.FIELD_ENCRYPTION_KEY_CURRENT_ID; const encoded = currentId && keyring ? keyring[currentId] : undefined; if (encoded) fieldKey = Buffer.from(encoded, 'base64'); } catch { fieldKey = null; }
+  if (process.env.NODE_ENV === 'production' && (!dbPool || !auditKey || auditKey.length < 32 || !fieldKey || fieldKey.length !== 32)) throw new Error('Production M2 persistence requires DATABASE_URL, a 32-byte AUDIT_HMAC_KEY, and the configured 32-byte FIELD_ENCRYPTION_KEYS key');
+  const foundation = dbPool && auditKey && fieldKey ? createDrizzleM2FoundationService({ pool: dbPool, auditKey, fieldKey }) : undefined;
+  const app = buildServer({ foundation });
   const shutdown = async (): Promise<void> => {
     await app.close();
+    await dbPool?.end();
     await telemetry.shutdown();
     process.exit(0);
   };

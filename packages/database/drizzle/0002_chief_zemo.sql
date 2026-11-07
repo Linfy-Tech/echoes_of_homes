@@ -1,0 +1,2 @@
+ALTER TABLE "consent_records" ADD CONSTRAINT "consent_records_supersedes_id_consent_records_id_fk" FOREIGN KEY ("supersedes_id") REFERENCES "public"."consent_records"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "consent_scripts" ADD CONSTRAINT "consent_scripts_placeholder_unpublished" CHECK ("consent_scripts"."version" NOT LIKE '%placeholder%' OR ("consent_scripts"."approved_by" IS NULL AND "consent_scripts"."published_at" IS NULL));
