@@ -3,7 +3,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto
 export type MediaRole = 'original' | 'playback' | 'processing' | 'consent_evidence' | 'consent_script_audio' | 'export_archive';
 export type ProviderRef = Readonly<{ provider: 'fake' | 'cloudinary'; publicId: string; resourceType: 'video' | 'raw'; deliveryType: 'authenticated' }>;
 export type DerivativeSpec = Readonly<{ role: 'playback'; format: string; bitrateKbps: number; channels: 1 | 2 }>;
-export type UploadSession = Readonly<{ assetId: string; provider: 'fake' | 'cloudinary'; uploadId: string; publicId: string; chunkSizeBytes: number; expiresAt: Date; signature: string; uploadUrl: string }>;
+export type UploadSession = Readonly<{ assetId: string; provider: 'fake' | 'cloudinary'; uploadId: string; publicId: string; chunkSizeBytes: number; expiresAt: Date; signature: string; uploadUrl: string; params?: Readonly<Record<string, string>> }>;
 export type MediaEvent = Readonly<{ provider: 'fake' | 'cloudinary'; eventId: string; publicId: string; assetId: string; status: 'uploaded'; timestamp: number }>;
 export type ByteRange = Readonly<{ start: number; end?: number }>;
 export type MediaStream = Readonly<{ body: AsyncIterable<Uint8Array>; bytes: number; mimeType: string; contentRange?: string }>;
@@ -14,7 +14,7 @@ export interface MediaStorageProvider {
   readonly name: 'cloudinary' | 'fake';
   createUploadSession(input: { assetId: string; role: MediaRole; mimeType: string; sizeBytes: number; derivatives: DerivativeSpec[] }): Promise<UploadSession>;
   refreshUploadSession(assetId: string): Promise<UploadSession>;
-  uploadChunk(uploadId: string, chunk: Uint8Array, range: { start: number; end: number; total: number }): Promise<{ done: boolean; bytes: number }>;
+  uploadChunk(uploadId: string, chunk: Uint8Array, range: { start: number; end: number; total: number }): Promise<{ done: boolean; bytes: number; publicId?: string }>;
   verifyNotification(headers: Headers, rawBody: Buffer): Promise<MediaEvent | null>;
   openStream(ref: ProviderRef, range?: ByteRange): Promise<MediaStream>;
   download(ref: ProviderRef, destPath: string): Promise<{ bytes: number }>;
@@ -39,7 +39,7 @@ export class FakeMediaStorageProvider implements MediaStorageProvider {
     const ref: ProviderRef = { provider: 'fake', publicId, resourceType: 'video', deliveryType: 'authenticated' };
     this.uploads.set(uploadId, { assetId: input.assetId, ref, mimeType: input.mimeType, expected: input.sizeBytes, bytes: Buffer.alloc(0) });
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    return { assetId: input.assetId, provider: 'fake', uploadId, publicId, chunkSizeBytes: 5_000_000, expiresAt: new Date(Date.now() + 3_600_000), signature: signatureFor(Buffer.from(publicId), timestamp, this.webhookSecret), uploadUrl: `https://fake.invalid/upload/${uploadId}` };
+    return { assetId: input.assetId, provider: 'fake', uploadId, publicId, chunkSizeBytes: 5_000_000, expiresAt: new Date(Date.now() + 3_600_000), signature: signatureFor(Buffer.from(publicId), timestamp, this.webhookSecret), uploadUrl: `https://fake.invalid/upload/${uploadId}`, params: { public_id: publicId, type: 'authenticated', resource_type: 'video' } };
   }
   async refreshUploadSession(assetId: string) { const entry = [...this.uploads.values()].find((upload) => upload.assetId === assetId); if (!entry) throw new Error('upload_not_found'); return this.createUploadSession({ assetId, role: 'original', mimeType: entry.mimeType, sizeBytes: entry.expected, derivatives: [] }); }
   async uploadChunk(uploadId: string, chunk: Uint8Array, range: { start: number; end: number; total: number }) { const upload = this.uploads.get(uploadId); if (!upload || range.start !== upload.bytes.length || range.total !== upload.expected || range.end - range.start + 1 !== chunk.byteLength) throw new Error('invalid_upload_chunk'); upload.bytes = Buffer.concat([upload.bytes, Buffer.from(chunk)]); const done = upload.bytes.length === upload.expected; if (done) { const hash = createHash('sha256').update(upload.bytes).digest('hex'); this.assets.set(upload.ref.publicId, { ref: upload.ref, bytes: upload.bytes.length, sha256: hash, mimeType: upload.mimeType, durationMs: 1_000, hasAudio: true, bytesData: upload.bytes }); } return { done, bytes: upload.bytes.length }; }
