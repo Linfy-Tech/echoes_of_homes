@@ -50,7 +50,7 @@ jobs:
       - name: Start web for recording e2e
         run: |
           pnpm --filter @echoes-of-home/web start -- --hostname 127.0.0.1 --port 3000 > /tmp/echoes-web.log 2>&1 &
-          curl --fail --retry 30 --retry-delay 2 http://127.0.0.1:3000/record
+          curl --fail --retry 30 --retry-connrefused --retry-delay 2 http://127.0.0.1:3000/record
       - name: Recording upload resume e2e (Playwright)
         run: pnpm --filter @echoes-of-home/web exec env RUN_PLAYWRIGHT=1 node --experimental-strip-types --test test/recording.e2e.test.mjs
       - name: Authorization policy matrix
