@@ -40,6 +40,6 @@ test('recording upload resumes after an interrupted throttled browser request', 
     await page.getByRole('button', { name: 'Resume recording' }).click();
     await page.getByRole('button', { name: 'Stop and upload' }).click();
     await page.getByText('Upload complete. Verification is in progress.').waitFor();
-    assert.match(await page.locator('[role=status]').innerText(), /Verification/);
+    assert.match(await page.getByText('Upload complete. Verification is in progress.', { exact: true }).innerText(), /Verification/);
   } finally { await browser.close(); }
 });
