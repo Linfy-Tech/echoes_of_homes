@@ -7,6 +7,7 @@
     "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
     "test:audit-chain": "node --test --test-timeout=120000 test/audit-chain.test.mjs",
     "test:migrations": "node --test --test-timeout=120000 test/migrations.test.mjs",
+    "test:m2-repository": "node --experimental-strip-types --test --test-timeout=120000 test/m2-repository.test.mjs",
     "typecheck": "tsc --build --pretty false"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
   },
   "exports": {
     "./audit-chain": "./src/audit-chain.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./m2-repository": "./src/m2-repository.ts"
   }
 }

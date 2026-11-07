@@ -52,6 +52,16 @@ const allowed = Object.freeze({
   'story.metadata.edit': ['storyteller_rights_holder', 'rights_holder_custodian', 'recorder'],
   'admin.jobs': ['platform_admin', 'admin_break_glass'],
   'admin.break_glass': ['platform_admin', 'admin_break_glass'],
+  'family.create': ['storyteller_rights_holder', 'storyteller_with_custodian', 'rights_holder_custodian', 'recorder', 'transcript_reviewer', 'translation_reviewer', 'viewer', 'family_member', 'family_admin', 'outsider'],
+  'family.read': ['family_member', 'family_admin'],
+  'family.invite': ['family_admin'],
+  'family.member.remove': ['family_admin'],
+  'person.read': ['family_admin'],
+  'person.create': [],
+  'person.link_account': [],
+  'story.create': ['storyteller_rights_holder', 'storyteller_with_custodian', 'recorder', 'family_member', 'family_admin'],
+  'custodian.designate': ['storyteller_rights_holder'],
+  'invitation.accept': [],
 });
 
 function resource(profile, changes = {}) {
@@ -126,4 +136,27 @@ test('M1 policy conditions fail closed for ownership, scopes, audience, state, a
 test('M1 assertCan returns a typed server-side denial', () => {
   const fixture = resource('outsider');
   assert.throws(() => assertCan(fixture.actor, 'transcript.read', fixture.resource), (error) => error instanceof AuthorizationError && error.code === 'authorization_denied' && error.reason === 'missing_role');
+});
+
+test('M2 policy additions deny non-members and non-admin family members', () => {
+  assert.equal(can(resource('family_admin').actor, 'family.invite', resource('family_admin').resource), true);
+  assert.equal(can(resource('family_member').actor, 'family.invite', resource('family_member').resource), false);
+  assert.equal(can(resource('outsider').actor, 'family.read', resource('outsider').resource), false);
+  assert.equal(can(resource('outsider').actor, 'story.read', resource('outsider').resource), false);
+  assert.equal(can(resource('storyteller_rights_holder').actor, 'consent.create', resource('storyteller_rights_holder').resource), true);
+  assert.equal(can(resource('family_member').actor, 'consent.create', resource('family_member').resource), false);
+  assert.equal(can(resource('rights_holder_custodian').actor, 'consent.withdraw', resource('rights_holder_custodian').resource), true);
+  assert.equal(can(resource('recorder').actor, 'consent.withdraw', resource('recorder').resource), false);
+  assert.equal(can(resource('storyteller_rights_holder').actor, 'person.create', { ...resource('storyteller_rights_holder').resource, personCreatorUserId: ids.storyteller }), true);
+  assert.equal(can(resource('outsider').actor, 'person.create', { ...resource('outsider').resource, personCreatorUserId: ids.storyteller }), false);
+  assert.equal(can(resource('storyteller_rights_holder').actor, 'person.read', { ...resource('storyteller_rights_holder').resource, personCreatorUserId: ids.storyteller }), true);
+  assert.equal(can(resource('outsider').actor, 'person.read', { ...resource('outsider').resource, personCreatorUserId: ids.storyteller }), false);
+  assert.equal(can(resource('storyteller_rights_holder').actor, 'person.link_account', { ...resource('storyteller_rights_holder').resource, invitationRecipientUserId: ids.storyteller }), true);
+  assert.equal(can(resource('outsider').actor, 'person.link_account', { ...resource('outsider').resource, invitationRecipientUserId: ids.storyteller }), false);
+  assert.equal(can(resource('family_admin').actor, 'story.create', resource('family_admin').resource), true);
+  assert.equal(can(resource('outsider').actor, 'story.create', { ...resource('outsider').resource, actorCircleRole: 'none', storytellerUserId: 'different', recorderUserId: 'different' }), false);
+  assert.equal(can(resource('storyteller_rights_holder').actor, 'custodian.designate', resource('storyteller_rights_holder').resource), true);
+  assert.equal(can(resource('storyteller_with_custodian').actor, 'custodian.designate', resource('storyteller_with_custodian').resource), false);
+  assert.equal(can(resource('storyteller_rights_holder').actor, 'invitation.accept', { ...resource('storyteller_rights_holder').resource, invitationRecipientUserId: ids.storyteller }), true);
+  assert.equal(can(resource('outsider').actor, 'invitation.accept', { ...resource('outsider').resource, invitationRecipientUserId: ids.storyteller }), false);
 });

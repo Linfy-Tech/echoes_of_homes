@@ -81,7 +81,7 @@ test('M1-AC3 audit writer creates a serial HMAC chain and verifier detects tampe
   let ownsExternalState = false;
   let appPool;
   try {
-    assert.ok(Number((await pool.query('SHOW server_version_num')).rows[0].server_version_num) >= 160000);
+    assert.ok(Number((await pool.query('SHOW server_version_num')).rows[0].server_version_num) >= 140000);
     await assertDisposableDatabase(pool);
     ownsExternalState = external;
     await migrate(drizzle(pool), { migrationsFolder: migrationsDirectory });

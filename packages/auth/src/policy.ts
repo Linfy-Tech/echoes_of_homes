@@ -7,6 +7,8 @@ export const policyActions = [
   'translation.issue.manage', 'translation.approve', 'story.approve_final', 'story.audience.change',
   'story.delete', 'story.export', 'story.activity.read', 'glossary.propose', 'glossary.approve',
   'story.metadata.edit', 'admin.jobs', 'admin.break_glass',
+  'family.create', 'family.read', 'family.invite', 'family.member.remove', 'person.read', 'person.create', 'person.link_account',
+  'story.create', 'custodian.designate', 'invitation.accept',
 ] as const;
 
 export type PolicyAction = typeof policyActions[number];
@@ -44,6 +46,11 @@ export type StoryResourceContext = Readonly<{
   audienceChange?: 'widen' | 'narrow';
   adminReadOnlyProjection: boolean;
   adminDeletionApproved: boolean;
+  familyCircleRole?: 'none' | 'family_member' | 'family_admin';
+  personCreatorUserId?: string | null;
+  personLinkedUserId?: string | null;
+  invitationCreatorUserId?: string | null;
+  invitationRecipientUserId?: string | null;
 }>;
 
 export class AuthorizationError extends Error {
@@ -110,6 +117,16 @@ const policies: Readonly<Record<PolicyAction, Predicate>> = {
   'glossary.propose': allowIf((actor, resource) => storyteller(actor, resource) || rightsHolder(actor, resource) || recorder(actor, resource) || reviewAccess(resource) || translationReviewAccess(resource) || ['family_member', 'family_admin'].includes(resource.actorCircleRole)),
   'glossary.approve': allowIf((actor, resource) => storytellerIsRightsHolder(actor, resource) || rightsHolder(actor, resource)),
   'story.metadata.edit': allowIf((actor, resource) => rightsHolder(actor, resource) || (recorder(actor, resource) && !resource.firstStoryVersionApproved)),
+  'family.read': allowIf((_actor, resource) => resource.actorCircleRole === 'family_member' || resource.actorCircleRole === 'family_admin'),
+  'family.create': allowIf(() => true),
+  'family.invite': allowIf((_actor, resource) => resource.actorCircleRole === 'family_admin'),
+  'family.member.remove': allowIf((_actor, resource) => resource.actorCircleRole === 'family_admin'),
+  'person.read': allowIf((actor, resource) => resource.personCreatorUserId === actor.userId || resource.personLinkedUserId === actor.userId || resource.actorCircleRole === 'family_admin'),
+  'person.create': allowIf((actor, resource) => resource.personCreatorUserId === actor.userId),
+  'person.link_account': allowIf((actor, resource) => resource.invitationRecipientUserId === actor.userId || resource.personCreatorUserId === actor.userId),
+  'story.create': allowIf((actor, resource) => storyteller(actor, resource) || resource.actorCircleRole === 'family_member' || resource.actorCircleRole === 'family_admin' || resource.recorderUserId === actor.userId),
+  'custodian.designate': allowIf((actor, resource) => storytellerIsRightsHolder(actor, resource)),
+  'invitation.accept': allowIf((actor, resource) => resource.invitationRecipientUserId === actor.userId),
   'admin.jobs': allowIf((actor) => isAdmin(actor)),
   'admin.break_glass': allowIf((actor) => isAdmin(actor)),
 };

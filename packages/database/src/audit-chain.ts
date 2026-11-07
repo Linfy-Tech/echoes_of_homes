@@ -178,6 +178,45 @@ export function createAuthAuditSink(options: { key: Buffer; context: (mutation: 
   };
 }
 
+export type DomainAuditMutation = {
+  model: string;
+  operation: string;
+  entityId: string;
+  storyId?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+/** Writes a domain mutation into the same caller-owned transaction. */
+export function createDomainAuditWriter(options: { key: Buffer; context: (mutation: DomainAuditMutation) => AuditContext }) {
+  const key = hmacKey(options.key);
+  return async (tx: Pick<PoolClient, 'query'>, mutation: DomainAuditMutation): Promise<void> => {
+    const context = contextValue(options.context(mutation));
+    const isolation = await tx.query<{ transaction_isolation: string }>('SHOW transaction_isolation');
+    if (isolation.rows[0]?.transaction_isolation !== 'read committed') throw new Error('Audit writes require READ COMMITTED transactions');
+    await tx.query('SELECT pg_advisory_xact_lock(1162827569, 1096107092)');
+    const previous = await tx.query<{ hash: Buffer }>('SELECT hash FROM audit_events ORDER BY id DESC LIMIT 1');
+    const prevHash = previous.rows[0]?.hash ?? zeroHash;
+    const reservation = await tx.query<{ id: string; occurred_at: Date }>("SELECT nextval(pg_get_serial_sequence('audit_events','id'))::text AS id, now() AS occurred_at");
+    const reserved = reservation.rows[0];
+    if (!reserved) throw new Error('Audit sequence unavailable');
+    const event: AuditEvent = {
+      ...context,
+      id: reserved.id,
+      occurredAt: reserved.occurred_at,
+      action: `${mutation.model}.${mutation.operation}`,
+      entityType: mutation.model,
+      entityId: uuidValue(mutation.entityId),
+      metadata: mutation.metadata ?? { operation: mutation.operation },
+      storyId: mutation.storyId == null ? null : uuidValue(mutation.storyId),
+    };
+    const hash = eventHash(key, event, prevHash);
+    await tx.query(
+      'INSERT INTO audit_events (id,occurred_at,actor_type,actor_user_id,action,entity_type,entity_id,story_id,metadata,correlation_id,prev_hash,hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+      [event.id, event.occurredAt, event.actorType, event.actorUserId, event.action, event.entityType, event.entityId, event.storyId, event.metadata, event.correlationId, prevHash, hash],
+    );
+  };
+}
+
 export async function verifyAuditChain(db: Pick<PoolClient, 'query'>, auditKey: Buffer): Promise<AuditVerificationResult> {
   const key = hmacKey(auditKey);
   const result = await db.query<AuditDatabaseRow>('SELECT id::text,occurred_at,actor_type,actor_user_id,action,entity_type,entity_id,story_id,metadata,correlation_id,prev_hash,hash FROM audit_events ORDER BY audit_events.id ASC');
