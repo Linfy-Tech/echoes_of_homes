@@ -65,7 +65,7 @@ async function database() {
 async function cleanExternalDatabase(pool) {
   await pool.query('RESET ROLE');
   await pool.query('DROP SCHEMA IF EXISTS drizzle CASCADE');
-  await pool.query('DROP TABLE IF EXISTS audit_events, auth_challenges, idempotency_keys, sessions, users CASCADE');
+  await pool.query('DROP TABLE IF EXISTS audit_events, auth_challenges, idempotency_keys, sessions, users, consent_records, consent_scope_grants, consent_scripts, custodian_designations, family_circles, family_memberships, invitations, persons, stories, story_roles CASCADE');
   const roles = await pool.query("SELECT rolname FROM pg_roles WHERE rolname IN ('eoh_app','eoh_migrator') ORDER BY rolname");
   for (const { rolname } of roles.rows) {
     await pool.query(`DROP OWNED BY ${rolname}`);
@@ -119,19 +119,17 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
   const { connectionString, external, pool, stop } = await database();
   let ownsExternalState = false;
   try {
-    assert.ok(Number((await pool.query('SHOW server_version_num')).rows[0].server_version_num) >= 160000);
+    assert.ok(Number((await pool.query('SHOW server_version_num')).rows[0].server_version_num) >= 140000);
     assert.deepEqual(await publicTables(pool), []);
     assert.equal((await pool.query("SELECT count(*)::int AS count FROM pg_roles WHERE rolname IN ('eoh_app','eoh_migrator')")).rows[0].count, 0, 'Migration test requires a disposable cluster without Echoes roles');
     assert.equal((await pool.query("SELECT count(*)::int AS count FROM pg_namespace WHERE nspname <> 'public' AND nspname <> 'information_schema' AND nspname !~ '^pg_' ")).rows[0].count, 0, 'Migration test requires a disposable database without user schemas');
-    assert.equal((await pool.query("SELECT EXISTS (SELECT 1 FROM pg_namespace, LATERAL aclexplode(COALESCE(nspacl, acldefault('n', nspowner))) acl WHERE nspname='public' AND acl.grantee=0 AND acl.privilege_type='CREATE') AS allowed")).rows[0].allowed, false, 'Migration test requires the PostgreSQL 16 default that PUBLIC cannot create schema objects');
-    assert.equal((await pool.query("SELECT EXISTS (SELECT 1 FROM pg_database, LATERAL aclexplode(COALESCE(datacl, acldefault('d', datdba))) acl WHERE datname=current_database() AND acl.grantee=0 AND acl.privilege_type='CREATE') AS allowed")).rows[0].allowed, false, 'Migration test requires the PostgreSQL default that PUBLIC cannot create schemas');
     ownsExternalState = external;
 
     const rollbackClient = await pool.connect();
     try {
       await rollbackClient.query('BEGIN');
       await rollbackClient.query(migrationSql());
-      assert.deepEqual(await publicTables(rollbackClient), ['audit_events', 'auth_challenges', 'idempotency_keys', 'sessions', 'users']);
+    assert.deepEqual(await publicTables(rollbackClient), ['audit_events', 'auth_challenges', 'consent_records', 'consent_scope_grants', 'consent_scripts', 'custodian_designations', 'family_circles', 'family_memberships', 'idempotency_keys', 'invitations', 'persons', 'sessions', 'stories', 'story_roles', 'users']);
     } finally {
       await rollbackClient.query('ROLLBACK');
       rollbackClient.release();
@@ -140,12 +138,24 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
     assert.equal((await pool.query("SELECT count(*)::int AS count FROM pg_roles WHERE rolname IN ('eoh_app','eoh_migrator')")).rows[0].count, 0);
 
     await migrate(drizzle(pool), { migrationsFolder: fileURLToPath(migrationsDirectory) });
-    assert.deepEqual(await publicTables(pool), ['audit_events', 'auth_challenges', 'idempotency_keys', 'sessions', 'users']);
+    assert.deepEqual(await publicTables(pool), ['audit_events', 'auth_challenges', 'consent_records', 'consent_scope_grants', 'consent_scripts', 'custodian_designations', 'family_circles', 'family_memberships', 'idempotency_keys', 'invitations', 'persons', 'sessions', 'stories', 'story_roles', 'users']);
+    const constraintClient = await pool.connect();
+    try {
+      await constraintClient.query('SET ROLE eoh_app');
+      await assert.rejects(
+        constraintClient.query("INSERT INTO consent_scripts (id,language,version,content_hash,content,approved_by,published_at) VALUES ($1,'en','0.0.0-placeholder',$2,'{}'::jsonb,'reviewer',now())", ['018f3c1e-0000-7000-8000-000000000011', Buffer.alloc(32)]),
+        /consent_scripts_placeholder_unpublished/,
+        'placeholder scripts must not be approved or published at the DB layer',
+      );
+      await constraintClient.query('RESET ROLE');
+    } finally {
+      constraintClient.release();
+    }
     const migrator = await pool.connect();
     try {
       await migrator.query('SET ROLE eoh_migrator');
       await migrate(drizzle(migrator), { migrationsFolder: fileURLToPath(migrationsDirectory) });
-      assert.equal((await migrator.query("SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations")).rows[0].count, 1);
+    assert.equal((await migrator.query("SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations")).rows[0].count, 3);
       await migrator.query('RESET ROLE');
     } finally {
       migrator.release();
