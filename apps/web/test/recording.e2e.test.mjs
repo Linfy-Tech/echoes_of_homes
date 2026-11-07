@@ -35,6 +35,7 @@ test('recording upload resumes after an interrupted throttled browser request', 
     await page.getByLabel('Story ID').fill(process.env.EOH_TEST_STORY_ID ?? '00000000-0000-0000-0000-000000000001');
     await page.getByRole('button', { name: 'Start recording' }).click();
     await page.getByRole('button', { name: 'Stop and upload' }).click();
+    await page.getByText('Upload paused. Reload to retry the unfinished recording.').waitFor();
     await page.reload();
     await page.getByRole('button', { name: 'Resume recording' }).click();
     await page.getByRole('button', { name: 'Stop and upload' }).click();
