@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   bigserial,
+  bigint,
   boolean,
   check,
   customType,
@@ -158,6 +159,22 @@ export const consentRecords = pgTable('consent_records', {
 export const consentScopeGrants = pgTable('consent_scope_grants', {
   consentRecordId: uuid('consent_record_id').notNull().references(() => consentRecords.id, { onDelete: 'cascade' }), scope: text('scope').notNull(), granted: boolean('granted').notNull(),
 }, (table) => [primaryKey({ columns: [table.consentRecordId, table.scope] }), check('consent_scope_allowed', sql`${table.scope} IN ('record_and_store', 'cross_border_processing', 'ai_transcription', 'human_review', 'translation', 'share_family', 'share_public', 'model_training')`), check('consent_scope_r1_disabled', sql`${table.scope} NOT IN ('share_public', 'model_training') OR ${table.granted} = false`)]);
+
+export const recordings = pgTable('recordings', {
+  id: uuid('id').primaryKey(), storyId: uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }), status: text('status').notNull().default('pending_upload'), source: text('source').notNull(), declaredSha256: bytea('declared_sha256').notNull(), declaredSizeBytes: bigint('declared_size_bytes', { mode: 'number' }), declaredMime: text('declared_mime'), verifiedSha256: bytea('verified_sha256'), durationMs: integer('duration_ms'), codec: text('codec'), failureReason: text('failure_reason'), uploadExpiresAt: timestampTz('upload_expires_at').notNull(), createdAt: timestampTz('created_at').notNull().defaultNow(), updatedAt: timestampTz('updated_at').notNull().defaultNow(), version: integer('version').notNull().default(1),
+}, (table) => [uniqueIndex('recordings_one_live_story_unique').on(table.storyId).where(sql`${table.status} NOT IN ('failed','abandoned','deleted')`), check('recordings_status_allowed', sql`${table.status} IN ('pending_upload','uploaded','verifying','verified','failed','abandoned','deleted')`), check('recordings_source_allowed', sql`${table.source} IN ('browser_recording','file_upload')`), check('recordings_failure_allowed', sql`${table.failureReason} IS NULL OR ${table.failureReason} IN ('hash_mismatch','no_audio_stream','too_long','unsupported_format','provider_error')`)]);
+
+export const mediaAssets = pgTable('media_assets', {
+  id: uuid('id').primaryKey(), storyId: uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }), recordingId: uuid('recording_id').references(() => recordings.id, { onDelete: 'set null' }), role: text('role').notNull(), provider: text('provider').notNull(), providerPublicId: text('provider_public_id').notNull(), providerResourceType: text('provider_resource_type').notNull(), providerDeliveryType: text('provider_delivery_type').notNull(), sha256: bytea('sha256'), sizeBytes: bigint('size_bytes', { mode: 'number' }), status: text('status').notNull().default('pending'), derivedFromAssetId: uuid('derived_from_asset_id').references((): AnyPgColumn => mediaAssets.id), createdAt: timestampTz('created_at').notNull().defaultNow(), deletedAt: timestampTz('deleted_at'),
+}, (table) => [uniqueIndex('media_assets_provider_public_id_unique').on(table.provider, table.providerPublicId), index('media_assets_story_role_idx').on(table.storyId, table.role), check('media_assets_role_allowed', sql`${table.role} IN ('original','playback','processing','consent_evidence','consent_script_audio','export_archive')`), check('media_assets_provider_allowed', sql`${table.provider} IN ('cloudinary','fake')`), check('media_assets_status_allowed', sql`${table.status} IN ('pending','available','failed','deleting','deleted')`)]);
+
+export const processingJobs = pgTable('processing_jobs', {
+  id: uuid('id').primaryKey(), storyId: uuid('story_id').references(() => stories.id, { onDelete: 'cascade' }), type: text('type').notNull(), status: text('status').notNull().default('queued'), inputRef: jsonb('input_ref').notNull(), attempts: integer('attempts').notNull().default(0), maxAttempts: integer('max_attempts').notNull().default(3), lastErrorCode: text('last_error_code'), correlationId: text('correlation_id').notNull(), idempotencyKey: text('idempotency_key').notNull(), createdAt: timestampTz('created_at').notNull().defaultNow(), startedAt: timestampTz('started_at'), finishedAt: timestampTz('finished_at'),
+}, (table) => [uniqueIndex('processing_jobs_idempotency_unique').on(table.idempotencyKey), index('processing_jobs_story_type_status_idx').on(table.storyId, table.type, table.status), check('processing_jobs_status_allowed', sql`${table.status} IN ('queued','waiting_budget','running','succeeded','failed_retryable','failed_permanent','cancelled')`)]);
+
+export const webhookReceipts = pgTable('webhook_receipts', {
+  provider: text('provider').notNull(), providerEventId: text('provider_event_id').notNull(), receivedAt: timestampTz('received_at').notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.provider, table.providerEventId] })]);
 
 export const custodianDesignations = pgTable('custodian_designations', {
   id: uuid('id').primaryKey(), storyId: uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }), custodianUserId: uuid('custodian_user_id').notNull().references(() => users.id), custodianPersonId: uuid('custodian_person_id').notNull().references(() => persons.id), status: text('status').notNull().default('pending_acceptance'), designatedInConsentRecordId: uuid('designated_in_consent_record_id').notNull().references(() => consentRecords.id), acceptedAt: timestampTz('accepted_at'), revokedAt: timestampTz('revoked_at'),

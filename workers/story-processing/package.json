@@ -7,6 +7,10 @@
     "typecheck": "tsc --build --pretty false"
   },
   "dependencies": {
-    "@echoes-of-home/observability": "workspace:*"
+    "@echoes-of-home/observability": "workspace:*",
+    "@echoes-of-home/database": "workspace:*",
+    "@echoes-of-home/media-storage": "workspace:*",
+    "graphile-worker": "0.18.0",
+    "pg": "8.16.3"
   }
 }

@@ -13,6 +13,7 @@ import { createStructuredLogger, startObservability } from '@echoes-of-home/obse
 import { LocalAuthService, type AuthService, type Session } from './auth-service.ts';
 import { createDrizzleM2FoundationService, M2FoundationService } from './m2-foundation.ts';
 import { Pool } from 'pg';
+import { createMediaFoundation, MediaDomainError, type MediaFoundation } from './media-foundation.ts';
 
 const challengeSchema = z.object({ email: z.string().email().max(320), uiLanguage: z.enum(['xh', 'en']).default('xh') }).strict();
 const verifySchema = z.object({ email: z.string().email().max(320), otp: z.string().regex(/^\d{6}$/) }).strict();
@@ -25,6 +26,8 @@ const invitationSchema = z.object({ type: z.enum(['family_member', 'custodian', 
 const consentSchema = z.object({ method: z.enum(['self_digital', 'assisted_verbal']), evidenceMediaAssetId: z.string().uuid().nullable().default(null), comprehensionResult: z.object({ questions: z.literal(3), correct: z.number().int().min(0).max(3), reexplained: z.boolean() }).strict(), rightsHolderChoice: z.enum(['self', 'custodian']), scopes: z.record(z.string(), z.boolean()) }).strict();
 const custodianSchema = z.object({ custodianEmail: z.string().email().max(320), custodianPersonId: z.string().uuid(), consentRecordId: z.string().uuid() }).strict();
 const storyRoleSchema = z.object({ userId: z.string().min(1), role: z.enum(['recorder', 'transcript_reviewer', 'translation_reviewer', 'viewer']) }).strict();
+const recordingSchema = z.object({ source: z.enum(['browser_recording', 'file_upload']), sha256: z.string().regex(/^[a-f0-9]{64}$/), sizeBytes: z.number().int().positive(), mimeType: z.string().regex(/^audio\//) }).strict();
+const recordingIdSchema = z.object({ id: z.string().uuid() });
 const baseResource: StoryResourceContext = { storytellerUserId: null, rightsHolderUserId: null, recorderUserId: null, actorStoryRoles: [], actorCircleRole: 'none', storyStatus: 'draft', deletionRequesterUserId: null, audience: 'private', hasApprovedVersion: false, translationApproved: false, activeConsentScopes: new Set(), hasValidBreakGlassGrant: false, assistedConsentSessionOpen: false, custodianAssistedConfirmationCurrent: false, firstStoryVersionApproved: false, adminReadOnlyProjection: true, adminDeletionApproved: false };
 
 type RequestWithState = FastifyRequest & { session?: Session | null; correlationId?: string };
@@ -42,9 +45,10 @@ function requireSession(request: RequestWithState, reply: FastifyReply): Session
 
 function assertRoutePolicy(session: Session, action: Parameters<typeof assertCan>[1]): void { assertCan(actorFor(session), action, resourceFor(session)); }
 
-export function buildServer(options: { auth?: AuthService; allowedOrigins?: readonly string[]; foundation?: M2FoundationService } = {}): FastifyInstance {
+export function buildServer(options: { auth?: AuthService; allowedOrigins?: readonly string[]; foundation?: M2FoundationService; media?: MediaFoundation } = {}): FastifyInstance {
   const auth = options.auth ?? new LocalAuthService();
   const foundation = options.foundation ?? new M2FoundationService();
+  const media = options.media ?? createMediaFoundation({ consentScopes: (storyId) => foundation.activeConsentScopes(storyId) });
   const logger = createStructuredLogger('api');
   const allowedOrigins = new Set(options.allowedOrigins ?? ['http://localhost:3000']);
   const app = Fastify({ logger: false });
@@ -72,7 +76,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
     if (token) request.session = await auth.getSession(token);
   });
   app.addHook('preHandler', async (request: RequestWithState, reply) => {
-    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) || request.url.startsWith('/v1/auth/challenges')) return;
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) || request.url.startsWith('/v1/auth/challenges') || request.url === '/v1/webhooks/media') return;
     const session = request.session;
     if (!session) { problem(reply, 401, 'unauthenticated', request.correlationId ?? 'unknown'); return reply; }
     const origin = request.headers.origin;
@@ -91,6 +95,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
     if (message === 'not_found') return problem(reply, 404, 'not_found', correlationId);
     if (message === 'placeholder_consent_script_forbidden') return problem(reply, 409, 'placeholder_consent_script_forbidden', correlationId);
     if (message === 'authorization_denied') return problem(reply, 403, 'forbidden', correlationId);
+    if (error instanceof MediaDomainError) { const status = error.code === 'validation_failed' ? 400 : ['consent_required', 'invalid_state_transition', 'upload_incomplete', 'hash_mismatch', 'job_cancelled'].includes(error.code) ? 409 : error.code === 'webhook_invalid' ? 401 : error.code === 'not_found' ? 404 : 500; return problem(reply, status, error.code, correlationId); }
     logger.error('request.failed', { correlationId, route: request.url.split('?')[0], status: 500, errorCode: 'internal_error' });
     return problem(reply, 500, 'internal_error', correlationId);
   });
@@ -122,6 +127,11 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   api.post('/v1/invitations/:id/accept', { schema: { params: z.object({ id: z.string().uuid() }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const invitation = await foundation.getInvitation(id); if (!invitation) throw new Error('not_found'); assertCan(actorFor(session), 'invitation.accept', await m2Resource(session, { invitationRecipientUserId: session.userId })); return reply.send(await foundation.acceptInvitation(id, session.userId)); });
   api.post('/v1/stories/:id/consent', { schema: { params: z.object({ id: z.string().uuid() }), body: consentSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const body = consentSchema.parse(request.body); assertCan(actorFor(session), 'consent.create', await m2Resource(session, { storyId: id, assistedConsentSessionOpen: body.method === 'assisted_verbal' })); return reply.code(201).send(await foundation.recordConsent(id, body, session.userId)); });
   api.post('/v1/stories/:id/consent/withdraw', { schema: { params: z.object({ id: z.string().uuid() }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; assertCan(actorFor(session), 'consent.withdraw', await m2Resource(session, { storyId: id })); return reply.send(await foundation.withdrawConsent(id, session.userId)); });
+  api.post('/v1/stories/:id/recordings', { schema: { params: z.object({ id: z.string().uuid() }), body: recordingSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const body = recordingSchema.parse(request.body); const resource = await m2Resource(session, { storyId: id }); assertCan(actorFor(session), 'recording.create', resource); return reply.code(201).send(await media.createRecording(session.userId, id, body, async () => assertCan(actorFor(session), 'recording.create', resource))); });
+  api.post('/v1/recordings/:id/complete', { schema: { params: recordingIdSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const recording = media.recordings.get(id); if (!recording) throw new MediaDomainError('not_found'); const resource = await m2Resource(session, { storyId: recording.storyId }); assertCan(actorFor(session), 'recording.complete', resource); return reply.send(await media.completeRecording(session.userId, id, async () => assertCan(actorFor(session), 'recording.complete', resource))); });
+  api.get('/v1/recordings/:id', { schema: { params: recordingIdSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const recording = media.recordings.get(id); if (!recording) throw new MediaDomainError('not_found'); const resource = await m2Resource(session, { storyId: recording.storyId }); assertCan(actorFor(session), 'recording.read', resource); return reply.send(await media.getRecording(session.userId, id, async () => assertCan(actorFor(session), 'recording.read', resource))); });
+  api.post('/v1/webhooks/media', async (request, reply) => { const body = Buffer.from(JSON.stringify(request.body)); const headers = new Headers(); for (const [key, value] of Object.entries(request.headers)) if (typeof value === 'string') headers.set(key, value); return reply.send(await media.webhook(headers, body)); });
+  api.get('/v1/stories/:id/audio', { schema: { params: z.object({ id: z.string().uuid() }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const resource = await m2Resource(session, { storyId: id }); assertCan(actorFor(session), 'story.audio.stream', resource); const range = typeof request.headers.range === 'string' ? request.headers.range.match(/^bytes=(\d+)-(\d*)$/) : null; const stream = await media.stream(session.userId, id, range ? { start: Number(range[1]), end: range[2] ? Number(range[2]) : undefined } : undefined, async () => assertCan(actorFor(session), 'story.audio.stream', resource)); const chunks: Buffer[] = []; for await (const chunk of stream.body) chunks.push(Buffer.from(chunk)); reply.header('content-type', stream.mimeType).header('cache-control', 'private, no-store').header('accept-ranges', 'bytes'); if (stream.contentRange) reply.header('content-range', stream.contentRange); return reply.code(stream.contentRange ? 206 : 200).send(Buffer.concat(chunks)); });
   api.post('/v1/stories/:id/roles', { schema: { params: z.object({ id: z.string().uuid() }), body: storyRoleSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; if (!await foundation.getStory(id)) throw new Error('not_found'); assertCan(actorFor(session), 'story.role.manage', await m2Resource(session, { storyId: id })); const body = storyRoleSchema.parse(request.body); return reply.code(201).send(await foundation.grantRole(id, body.userId, body.role, session.userId)); });
   api.get('/healthz', { config: { authorization: 'intentionally-public' } }, async (_request, reply) => reply.send({ ok: true }));
   });

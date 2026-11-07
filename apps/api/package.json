@@ -16,6 +16,7 @@
   "dependencies": {
     "@echoes-of-home/auth": "workspace:*",
     "@echoes-of-home/database": "workspace:*",
+    "@echoes-of-home/media-storage": "workspace:*",
     "@echoes-of-home/observability": "workspace:*",
     "@echoes-of-home/validation": "workspace:*",
     "@fastify/cookie": "^11.0.2",
