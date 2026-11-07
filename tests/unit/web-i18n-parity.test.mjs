@@ -13,7 +13,24 @@ function keys(value, prefix = '') {
   }).sort();
 }
 
+function assertCatalogueParity(xh, en) {
+  assert.deepEqual(keys(xh), keys(en), 'translation keys must stay in parity');
+}
+
 test('isiXhosa and English translation catalogues have identical keys', async () => {
   const [xh, en] = await Promise.all(['xh', 'en'].map(async (language) => JSON.parse(await readFile(join(directory, `${language}.json`), 'utf8'))));
-  assert.deepEqual(keys(xh), keys(en), 'translation keys must stay in parity');
+  assertCatalogueParity(xh, en);
+});
+
+test('missing isiXhosa key makes the parity check fail', async () => {
+  const [xh, en] = await Promise.all(['xh', 'en'].map(async (language) => JSON.parse(await readFile(join(directory, `${language}.json`), 'utf8'))));
+  const incompleteXh = structuredClone(xh);
+  delete incompleteXh['language.isixhosa'];
+
+  assert.throws(
+    () => assertCatalogueParity(incompleteXh, en),
+    (error) => error?.code === 'ERR_ASSERTION'
+      && error.message.startsWith('translation keys must stay in parity'),
+    'the CI parity test must fail when xh omits an en key',
+  );
 });
