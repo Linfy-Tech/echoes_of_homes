@@ -10,6 +10,9 @@
     "openapi:generate": "node --experimental-strip-types scripts/generate-openapi.mjs",
     "openapi:check": "node --experimental-strip-types scripts/generate-openapi.mjs --check"
   },
+  "exports": {
+    "./m2-foundation": "./src/m2-foundation.ts"
+  },
   "dependencies": {
     "@echoes-of-home/auth": "workspace:*",
     "@echoes-of-home/database": "workspace:*",
