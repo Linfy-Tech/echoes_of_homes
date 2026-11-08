@@ -6,11 +6,13 @@ import {
   boolean,
   check,
   customType,
+  date,
   index,
   integer,
   jsonb,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -171,6 +173,30 @@ export const mediaAssets = pgTable('media_assets', {
 export const processingJobs = pgTable('processing_jobs', {
   id: uuid('id').primaryKey(), storyId: uuid('story_id').references(() => stories.id, { onDelete: 'cascade' }), type: text('type').notNull(), status: text('status').notNull().default('queued'), inputRef: jsonb('input_ref').notNull(), attempts: integer('attempts').notNull().default(0), maxAttempts: integer('max_attempts').notNull().default(3), lastErrorCode: text('last_error_code'), correlationId: text('correlation_id').notNull(), idempotencyKey: text('idempotency_key').notNull(), createdAt: timestampTz('created_at').notNull().defaultNow(), startedAt: timestampTz('started_at'), finishedAt: timestampTz('finished_at'),
 }, (table) => [uniqueIndex('processing_jobs_idempotency_unique').on(table.idempotencyKey), index('processing_jobs_story_type_status_idx').on(table.storyId, table.type, table.status), check('processing_jobs_status_allowed', sql`${table.status} IN ('queued','waiting_budget','running','succeeded','failed_retryable','failed_permanent','cancelled')`)]);
+
+export const transcripts = pgTable('transcripts', {
+  id: uuid('id').primaryKey(), storyId: uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }), versionNumber: integer('version_number').notNull(), status: text('status').notNull(), derivedFromTranscriptId: uuid('derived_from_transcript_id'), asrProcessingJobId: uuid('asr_processing_job_id').notNull().references(() => processingJobs.id), approvedByUserId: uuid('approved_by_user_id').references(() => users.id), approvedAt: timestampTz('approved_at'), contentHash: bytea('content_hash'), createdAt: timestampTz('created_at').notNull().defaultNow(), updatedAt: timestampTz('updated_at').notNull().defaultNow(), version: integer('version').notNull().default(1),
+}, (table) => [uniqueIndex('transcripts_story_job_unique').on(table.storyId, table.asrProcessingJobId), uniqueIndex('transcripts_live_story_unique').on(table.storyId).where(sql`${table.status} IN ('generating','machine_draft','in_review','review_complete')`), check('transcripts_status_allowed', sql`${table.status} IN ('generating','machine_draft','in_review','review_complete','approved_for_translation','superseded','failed')`), check('transcripts_version_positive', sql`${table.versionNumber} >= 1`)]);
+
+export const transcriptSegments = pgTable('transcript_segments', {
+  id: uuid('id').primaryKey(), transcriptId: uuid('transcript_id').notNull().references(() => transcripts.id, { onDelete: 'cascade' }), ordinal: integer('ordinal').notNull(), startMs: integer('start_ms').notNull(), endMs: integer('end_ms').notNull(), text: text('text').notNull(), machineText: text('machine_text').notNull(), detectedLanguages: text('detected_languages').array().notNull().default(sql`'{}'::text[]`), asrConfidence: real('asr_confidence'), reviewState: text('review_state').notNull().default('unreviewed'), exclusionReason: text('exclusion_reason'), currentRevision: integer('current_revision').notNull().default(1), version: integer('version').notNull().default(1),
+}, (table) => [uniqueIndex('transcript_segments_transcript_ordinal_unique').on(table.transcriptId, table.ordinal), check('transcript_segments_time_order', sql`${table.startMs} >= 0 AND ${table.endMs} > ${table.startMs}`), check('transcript_segments_review_state_allowed', sql`${table.reviewState} IN ('unreviewed','confirmed','corrected','inaudible','excluded')`)]);
+
+export const uncertaintyFlags = pgTable('uncertainty_flags', {
+  id: uuid('id').primaryKey(), transcriptId: uuid('transcript_id').notNull().references(() => transcripts.id, { onDelete: 'cascade' }), segmentId: uuid('segment_id').notNull().references(() => transcriptSegments.id, { onDelete: 'cascade' }), charStart: integer('char_start'), charEnd: integer('char_end'), reason: text('reason').notNull(), source: text('source').notNull(), suggestionText: text('suggestion_text'), questionForReviewer: text('question_for_reviewer'), status: text('status').notNull().default('open'), resolvedByUserId: uuid('resolved_by_user_id').references(() => users.id), resolvedAt: timestampTz('resolved_at'), modelRunId: uuid('model_run_id'),
+}, (table) => [check('uncertainty_flags_status_allowed', sql`${table.status} IN ('open','resolved_confirmed','resolved_corrected','resolved_inaudible','accepted_as_uncertain')`), check('uncertainty_flags_source_allowed', sql`${table.source} IN ('asr_signal','heuristic','context_assist','dual_asr','reviewer')`)]);
+
+export const modelRuns = pgTable('model_runs', {
+  id: uuid('id').primaryKey(), processingJobId: uuid('processing_job_id').notNull().references(() => processingJobs.id, { onDelete: 'cascade' }), role: text('role').notNull(), provider: text('provider').notNull(), modelId: text('model_id').notNull(), modelVersionLabel: text('model_version_label'), promptId: text('prompt_id'), promptVersion: text('prompt_version'), params: jsonb('params').notNull().default(sql`'{}'::jsonb`), inputSha256: bytea('input_sha256').notNull(), outputSha256: bytea('output_sha256'), inputUnits: integer('input_units'), outputUnits: integer('output_units'), costUsdMicros: integer('cost_usd_micros'), latencyMs: integer('latency_ms'), outcome: text('outcome').notNull(), providerRequestId: text('provider_request_id'), createdAt: timestampTz('created_at').notNull().defaultNow(),
+}, (table) => [check('model_runs_role_allowed', sql`${table.role} IN ('listener_asr','listener_asr_secondary','context_assist','translator','verifier')`), check('model_runs_outcome_allowed', sql`${table.outcome} IN ('ok','schema_invalid','provider_error','timeout','refused','cancelled')`), check('model_runs_params_object', sql`jsonb_typeof(${table.params}) = 'object'`)]);
+
+export const jobStepResults = pgTable('job_step_results', {
+  processingJobId: uuid('processing_job_id').notNull().references(() => processingJobs.id, { onDelete: 'cascade' }), stepKind: text('step_kind').notNull(), stepIndex: integer('step_index').notNull(), result: jsonb('result').notNull(), modelRunId: uuid('model_run_id').references(() => modelRuns.id), createdAt: timestampTz('created_at').notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.processingJobId, table.stepKind, table.stepIndex] }), check('job_step_results_kind_allowed', sql`${table.stepKind} IN ('asr_chunk','translation_batch','verify_batch')`), check('job_step_results_object', sql`jsonb_typeof(${table.result}) = 'object'`)]);
+
+export const aiUsageDaily = pgTable('ai_usage_daily', {
+  date: date('date', { mode: 'string' }).notNull(), provider: text('provider').notNull(), costUsdMicros: integer('cost_usd_micros').notNull().default(0),
+}, (table) => [primaryKey({ columns: [table.date, table.provider] }), check('ai_usage_daily_cost_nonnegative', sql`${table.costUsdMicros} >= 0`)]);
 
 export const webhookReceipts = pgTable('webhook_receipts', {
   provider: text('provider').notNull(), providerEventId: text('provider_event_id').notNull(), receivedAt: timestampTz('received_at').notNull().defaultNow(),

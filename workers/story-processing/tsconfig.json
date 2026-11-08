@@ -1,5 +1,6 @@
 {
   "extends": "../../tsconfig.json",
+  "compilerOptions": { "allowImportingTsExtensions": true, "baseUrl": "../..", "paths": { "@echoes-of-home/ai-providers/asr": ["packages/ai-providers/src/asr.ts"], "@echoes-of-home/ai-providers/audio": ["packages/ai-providers/src/audio.ts"] } },
   "include": [
     "src/**/*"
   ],

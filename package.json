@@ -23,7 +23,8 @@
     "openapi:check": "pnpm --filter @echoes-of-home/api openapi:check",
     "test:web-i18n": "pnpm --filter @echoes-of-home/web test:i18n",
     "test:database-migrations": "pnpm --filter @echoes-of-home/database test:migrations",
-    "eval:asr": "node scripts/asr-eval.mjs"
+    "eval:asr": "node scripts/asr-eval.mjs",
+    "test:asr-pipeline": "pnpm --filter @echoes-of-home/ai-providers test && pnpm --filter @echoes-of-home/story-processing test"
   },
   "devDependencies": {
     "eslint": "10.14.0",

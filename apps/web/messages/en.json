@@ -43,5 +43,14 @@
   "sessions.previewPhone": "Phone browser",
   "sessions.previewLaptop": "Laptop browser",
   "sessions.revoke": "Sign out",
-  "offline.banner": "You are offline. Your language choice is still available."
+  "offline.banner": "You are offline. Your language choice is still available.",
+  "transcription.status.title": "Story transcription",
+  "transcription.status.storyId": "Story ID",
+  "transcription.status.refresh": "Check status",
+  "transcription.status.queued": "Queued",
+  "transcription.status.processing": "Processing",
+  "transcription.status.complete": "Complete",
+  "transcription.status.failed": "Failed",
+  "transcription.status.missingStory": "Enter the story ID first.",
+  "transcription.status.unavailable": "The transcription status is not available yet."
 }
