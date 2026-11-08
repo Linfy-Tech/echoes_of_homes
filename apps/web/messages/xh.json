@@ -52,5 +52,21 @@
   "transcription.status.complete": "Igqityiwe",
   "transcription.status.failed": "Ayiphumelelanga",
   "transcription.status.missingStory": "Faka i-ID yebali kuqala.",
-  "transcription.status.unavailable": "Inkqubela yokubhalwa ayikafumaneki."
+  "transcription.status.unavailable": "Inkqubela yokubhalwa ayikafumaneki.",
+  "review.title": "Jonga ibali",
+  "review.story": "Ibali",
+  "review.previewStory": "Ibali lokubonisa",
+  "review.remaining": "Iindawo ezifuna ingqalelo",
+  "review.segments": "Amacandelo ebali",
+  "review.segment": "Icandelo",
+  "review.play": "Dlala",
+  "review.flagged": "Nceda ujonge le ndawo",
+  "review.nextFlag": "Icandelo elilandelayo elingacacanga",
+  "review.confirm": "Qinisekisa",
+  "review.save": "Gcina ulungiso",
+  "review.completeAction": "Lugqityiwe uphononongo",
+  "review.saved": "Uphononongo lwakho lugciniwe.",
+  "review.complete": "Uphononongo lugqityiwe. Umnini webali angalivuma ngoku.",
+  "review.unavailable": "Olu phononongo alufumaneki ngoku.",
+  "review.conflict": "Omnye umntu utshintshe le ndawo. Hlaziya uze ujonge utshintsho lwakho ngaphambi kokugcina."
 }

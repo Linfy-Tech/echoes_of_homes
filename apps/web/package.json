@@ -5,6 +5,7 @@
   "scripts": {
     "typecheck": "tsc --build --pretty false",
     "test:i18n": "node --test ../../tests/unit/web-i18n-parity.test.mjs",
+    "test:a11y": "playwright test test/transcript-review-a11y.spec.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
@@ -16,6 +17,7 @@
     "react-dom": "19.1.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.65.0",
     "@types/node": "24.10.0",
     "@types/react": "19.1.13",

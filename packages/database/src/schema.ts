@@ -182,6 +182,10 @@ export const transcriptSegments = pgTable('transcript_segments', {
   id: uuid('id').primaryKey(), transcriptId: uuid('transcript_id').notNull().references(() => transcripts.id, { onDelete: 'cascade' }), ordinal: integer('ordinal').notNull(), startMs: integer('start_ms').notNull(), endMs: integer('end_ms').notNull(), text: text('text').notNull(), machineText: text('machine_text').notNull(), detectedLanguages: text('detected_languages').array().notNull().default(sql`'{}'::text[]`), asrConfidence: real('asr_confidence'), reviewState: text('review_state').notNull().default('unreviewed'), exclusionReason: text('exclusion_reason'), currentRevision: integer('current_revision').notNull().default(1), version: integer('version').notNull().default(1),
 }, (table) => [uniqueIndex('transcript_segments_transcript_ordinal_unique').on(table.transcriptId, table.ordinal), check('transcript_segments_time_order', sql`${table.startMs} >= 0 AND ${table.endMs} > ${table.startMs}`), check('transcript_segments_review_state_allowed', sql`${table.reviewState} IN ('unreviewed','confirmed','corrected','inaudible','excluded')`)]);
 
+export const transcriptRevisions = pgTable('transcript_revisions', {
+  id: uuid('id').primaryKey(), segmentId: uuid('segment_id').notNull().references(() => transcriptSegments.id, { onDelete: 'cascade' }), actorUserId: uuid('actor_user_id').notNull().references(() => users.id), fromText: text('from_text').notNull(), toText: text('to_text').notNull(), version: integer('version').notNull(), createdAt: timestampTz('created_at').notNull().defaultNow(),
+}, (table) => [uniqueIndex('transcript_revisions_segment_version_unique').on(table.segmentId, table.version)]);
+
 export const uncertaintyFlags = pgTable('uncertainty_flags', {
   id: uuid('id').primaryKey(), transcriptId: uuid('transcript_id').notNull().references(() => transcripts.id, { onDelete: 'cascade' }), segmentId: uuid('segment_id').notNull().references(() => transcriptSegments.id, { onDelete: 'cascade' }), charStart: integer('char_start'), charEnd: integer('char_end'), reason: text('reason').notNull(), source: text('source').notNull(), suggestionText: text('suggestion_text'), questionForReviewer: text('question_for_reviewer'), status: text('status').notNull().default('open'), resolvedByUserId: uuid('resolved_by_user_id').references(() => users.id), resolvedAt: timestampTz('resolved_at'), modelRunId: uuid('model_run_id'),
 }, (table) => [check('uncertainty_flags_status_allowed', sql`${table.status} IN ('open','resolved_confirmed','resolved_corrected','resolved_inaudible','accepted_as_uncertain')`), check('uncertainty_flags_source_allowed', sql`${table.source} IN ('asr_signal','heuristic','context_assist','dual_asr','reviewer')`)]);
@@ -197,6 +201,14 @@ export const jobStepResults = pgTable('job_step_results', {
 export const aiUsageDaily = pgTable('ai_usage_daily', {
   date: date('date', { mode: 'string' }).notNull(), provider: text('provider').notNull(), costUsdMicros: integer('cost_usd_micros').notNull().default(0),
 }, (table) => [primaryKey({ columns: [table.date, table.provider] }), check('ai_usage_daily_cost_nonnegative', sql`${table.costUsdMicros} >= 0`)]);
+
+export const familyGlossaryTerms = pgTable('family_glossary_terms', {
+  id: uuid('id').primaryKey(), storyId: uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }), term: text('term').notNull(), category: text('category').notNull(), status: text('status').notNull().default('proposed'), proposedByUserId: uuid('proposed_by_user_id').notNull().references(() => users.id), approvedByUserId: uuid('approved_by_user_id').references(() => users.id), createdAt: timestampTz('created_at').notNull().defaultNow(), updatedAt: timestampTz('updated_at').notNull().defaultNow(),
+}, (table) => [check('family_glossary_terms_status_allowed', sql`${table.status} IN ('proposed','approved','rejected')`), check('family_glossary_terms_term_length', sql`char_length(${table.term}) BETWEEN 1 AND 120`)]);
+
+export const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey(), recipientUserId: uuid('recipient_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), storyId: uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }), kind: text('kind').notNull(), readAt: timestampTz('read_at'), createdAt: timestampTz('created_at').notNull().defaultNow(),
+}, (table) => [check('notifications_kind_allowed', sql`${table.kind} IN ('reviewer_invited','review_complete','transcript_approved')`)]);
 
 export const webhookReceipts = pgTable('webhook_receipts', {
   provider: text('provider').notNull(), providerEventId: text('provider_event_id').notNull(), receivedAt: timestampTz('received_at').notNull().defaultNow(),
