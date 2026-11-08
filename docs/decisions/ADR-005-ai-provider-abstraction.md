@@ -35,9 +35,12 @@ recall, or review-effort results. No paid provider calls were made.
 The provisional hosted lead is Google Cloud Speech-to-Text V2 because the
 current supported-language table documents `xh-ZA` and a `chirp_2` entry in
 `europe-west4`; this is a documentation-based lead, not a provider decision.
-OpenAI remains a controlled-test candidate, Meta Omnilingual ASR a
-self-hosted candidate, and Lelapa AI Vulavula a specialist candidate whose
-current STT language list and commercial terms still require confirmation.
+OpenAI remains a controlled-test candidate and Meta Omnilingual ASR a
+self-hosted candidate. Lelapa AI Vulavula has a live REST API and paid plans,
+but its current language-support table marks isiXhosa unavailable for
+Transcribe/ASR (isiXhosa is listed for translation as beta/early access), so
+it is excluded from the current xh ASR shortlist unless Lelapa grants access
+or updates the documented capability.
 Azure standard STT is not currently listed for `xh-ZA` and is excluded unless
 Microsoft confirms support.
 
