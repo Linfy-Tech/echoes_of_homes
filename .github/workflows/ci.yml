@@ -67,6 +67,8 @@ jobs:
           echo "Web server did not become ready; log follows:"
           cat /tmp/echoes-web.log
           exit 1
+      - name: Transcript review accessibility (axe)
+        run: pnpm --filter @echoes-of-home/web test:a11y
       - name: Recording upload resume e2e (Playwright)
         run: pnpm --filter @echoes-of-home/web exec env RUN_PLAYWRIGHT=1 node --experimental-strip-types --test test/recording.e2e.test.mjs
       - name: Authorization policy matrix
