@@ -545,6 +545,14 @@
                       "file_upload"
                     ]
                   },
+                  "purpose": {
+                    "default": "story",
+                    "type": "string",
+                    "enum": [
+                      "story",
+                      "consent_evidence"
+                    ]
+                  },
                   "sha256": {
                     "type": "string",
                     "pattern": "^[a-f0-9]{64}$"
