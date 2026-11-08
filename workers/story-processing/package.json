@@ -4,9 +4,11 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-strip-types src/index.ts",
-    "typecheck": "tsc --build --pretty false"
+    "typecheck": "tsc --build --pretty false",
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
   },
   "dependencies": {
+    "@echoes-of-home/ai-providers": "workspace:*",
     "@echoes-of-home/observability": "workspace:*",
     "@echoes-of-home/database": "workspace:*",
     "@echoes-of-home/media-storage": "workspace:*",

@@ -43,5 +43,14 @@
   "sessions.previewPhone": "Isikhangeli sefowuni",
   "sessions.previewLaptop": "Isikhangeli selaptop",
   "sessions.revoke": "Phuma",
-  "offline.banner": "Awukho kwi-intanethi. Ukhetho lolwimi lusafumaneka."
+  "offline.banner": "Awukho kwi-intanethi. Ukhetho lolwimi lusafumaneka.",
+  "transcription.status.title": "Inkqubela yokubhalwa kwebali",
+  "transcription.status.storyId": "I-ID yebali",
+  "transcription.status.refresh": "Jonga inkqubela",
+  "transcription.status.queued": "Ilindile",
+  "transcription.status.processing": "Iyasebenza",
+  "transcription.status.complete": "Igqityiwe",
+  "transcription.status.failed": "Ayiphumelelanga",
+  "transcription.status.missingStory": "Faka i-ID yebali kuqala.",
+  "transcription.status.unavailable": "Inkqubela yokubhalwa ayikafumaneki."
 }

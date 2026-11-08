@@ -37,6 +37,8 @@ jobs:
         run: pnpm audit --audit-level high
       - run: pnpm typecheck
       - run: pnpm lint
+      - name: Provider-neutral ASR pipeline tests
+        run: pnpm test:asr-pipeline
       - name: OpenAPI generation drift check
         run: pnpm openapi:check
       - name: OpenAPI route coverage tests

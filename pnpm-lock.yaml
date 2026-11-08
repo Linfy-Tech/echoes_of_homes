@@ -273,7 +273,11 @@ importers:
 
   packages/agent-workflows: {}
 
-  packages/ai-providers: {}
+  packages/ai-providers:
+    devDependencies:
+      '@types/node':
+        specifier: 24.10.0
+        version: 24.10.0
 
   packages/auth:
     dependencies:
@@ -369,6 +373,9 @@ importers:
 
   workers/story-processing:
     dependencies:
+      '@echoes-of-home/ai-providers':
+        specifier: workspace:*
+        version: link:../../packages/ai-providers
       '@echoes-of-home/database':
         specifier: workspace:*
         version: link:../../packages/database

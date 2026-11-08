@@ -3,6 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --build --pretty false"
+    "typecheck": "tsc --build --pretty false",
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
+  },
+  "exports": {
+    "./asr": "./src/asr.ts",
+    "./audio": "./src/audio.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0"
   }
 }
