@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { FakeAsrProvider } from '../../../packages/ai-providers/src/asr.ts';
+import { FakeAsrProvider } from '@echoes-of-home/ai-providers/asr';
 import { AsrCircuitBreaker, createAsrStore, enqueueAsrJob, runAsrJob } from '../src/asr-pipeline.ts';
 
 const audio = new Uint8Array(1_000);
