@@ -39,6 +39,7 @@ const allowed = Object.freeze({
   'transcript.flag.accept_uncertain': ['storyteller_rights_holder', 'rights_holder_custodian'],
   'transcript.approve': ['storyteller_rights_holder', 'rights_holder_custodian'],
   'translation.read': ['storyteller_rights_holder', 'storyteller_with_custodian', 'rights_holder_custodian', 'transcript_reviewer', 'translation_reviewer', 'admin_break_glass'],
+  'translation.generate': ['storyteller_rights_holder', 'storyteller_with_custodian', 'rights_holder_custodian'],
   'translation.segment.edit': ['storyteller_rights_holder', 'storyteller_with_custodian', 'rights_holder_custodian', 'translation_reviewer'],
   'translation.issue.manage': ['storyteller_rights_holder', 'storyteller_with_custodian', 'rights_holder_custodian', 'translation_reviewer'],
   'translation.approve': ['storyteller_rights_holder', 'storyteller_with_custodian', 'rights_holder_custodian', 'translation_reviewer'],
@@ -98,6 +99,8 @@ test('M1 policy conditions fail closed for ownership, scopes, audience, state, a
   assert.equal(can(fixture.actor, 'story.audio.stream', fixture.resource), false, 'family access is revoked with share_family');
   fixture = resource('transcript_reviewer', { translationApproved: false, hasApprovedVersion: true });
   assert.equal(can(fixture.actor, 'translation.read', fixture.resource), false, 'an old story version never exposes a new draft translation');
+  fixture = resource('storyteller_rights_holder', { translationApproved: false });
+  assert.equal(can(fixture.actor, 'translation.generate', fixture.resource), false, 'translation generation requires an approved transcript');
   fixture = resource('transcript_reviewer', { translationApproved: true, hasApprovedVersion: false });
   assert.equal(can(fixture.actor, 'translation.read', fixture.resource), true, 'approved translation is visible before final story approval');
   fixture = resource('rights_holder_custodian', { custodianAssistedConfirmationCurrent: false });

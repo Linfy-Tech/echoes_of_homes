@@ -68,5 +68,12 @@
   "review.saved": "Your review was saved.",
   "review.complete": "Review complete. The storyteller can now approve it.",
   "review.unavailable": "This review is not available right now.",
-  "review.conflict": "Someone changed this part. Refresh and review your changes before saving."
+  "review.conflict": "Someone changed this part. Refresh and review your changes before saving.",
+  "translation.title": "Translation review",
+  "translation.blocking": "blocking verification issues",
+  "translation.approve": "Approve translation",
+  "translation.approved": "Translation approved",
+  "translation.resolveBlocking": "Resolve blocking verification issues first",
+  "translation.unavailable": "Translation unavailable",
+  "translation.sourceSegment": "isiXhosa source segment"
 }

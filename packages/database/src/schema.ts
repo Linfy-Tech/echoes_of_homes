@@ -210,6 +210,22 @@ export const notifications = pgTable('notifications', {
   id: uuid('id').primaryKey(), recipientUserId: uuid('recipient_user_id').notNull().references(() => users.id, { onDelete: 'cascade' }), storyId: uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }), kind: text('kind').notNull(), readAt: timestampTz('read_at'), createdAt: timestampTz('created_at').notNull().defaultNow(),
 }, (table) => [check('notifications_kind_allowed', sql`${table.kind} IN ('reviewer_invited','review_complete','transcript_approved')`)]);
 
+export const translations = pgTable('translations', {
+  id: uuid('id').primaryKey(), storyId: uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }), sourceTranscriptId: uuid('source_transcript_id').notNull().references(() => transcripts.id), versionNumber: integer('version_number').notNull().default(1), status: text('status').notNull().default('machine_draft'), createdAt: timestampTz('created_at').notNull().defaultNow(), updatedAt: timestampTz('updated_at').notNull().defaultNow(), version: integer('version').notNull().default(1),
+}, (table) => [uniqueIndex('translations_source_version_unique').on(table.sourceTranscriptId, table.versionNumber), check('translations_status_allowed', sql`${table.status} IN ('machine_draft','in_review','approved','rejected','superseded')`), check('translations_version_positive', sql`${table.versionNumber} >= 1`)]);
+
+export const translationSegments = pgTable('translation_segments', {
+  id: uuid('id').primaryKey(), translationId: uuid('translation_id').notNull().references(() => translations.id, { onDelete: 'cascade' }), sourceSegmentId: uuid('source_segment_id').notNull().references(() => transcriptSegments.id), closeText: text('close_text').notNull(), naturalText: text('natural_text').notNull(), machineCloseText: text('machine_close_text').notNull(), machineNaturalText: text('machine_natural_text').notNull(), renderMode: text('render_mode').notNull().default('normal'), reviewState: text('review_state').notNull().default('unreviewed'), version: integer('version').notNull().default(1),
+}, (table) => [uniqueIndex('translation_segments_source_unique').on(table.translationId, table.sourceSegmentId), check('translation_segments_render_mode_allowed', sql`${table.renderMode} IN ('normal','unclear_marker','inaudible_marker')`), check('translation_segments_review_state_allowed', sql`${table.reviewState} IN ('unreviewed','reviewed','edited')`)]);
+
+export const verificationReports = pgTable('verification_reports', {
+  id: uuid('id').primaryKey(), translationId: uuid('translation_id').notNull().unique().references(() => translations.id, { onDelete: 'cascade' }), status: text('status').notNull(), checksRun: jsonb('checks_run').notNull().default(sql`'[]'::jsonb`), createdAt: timestampTz('created_at').notNull().defaultNow(),
+}, (table) => [check('verification_reports_status_allowed', sql`${table.status} IN ('complete','incomplete')`), check('verification_reports_checks_array', sql`jsonb_typeof(${table.checksRun}) = 'array'`)]);
+
+export const verificationIssues = pgTable('verification_issues', {
+  id: uuid('id').primaryKey(), reportId: uuid('report_id').notNull().references(() => verificationReports.id, { onDelete: 'cascade' }), translationSegmentId: uuid('translation_segment_id').references(() => translationSegments.id, { onDelete: 'cascade' }), checkId: text('check_id').notNull(), severity: text('severity').notNull(), detail: jsonb('detail').notNull(), status: text('status').notNull().default('open'), dismissReason: text('dismiss_reason'), resolvedByUserId: uuid('resolved_by_user_id').references(() => users.id), createdAt: timestampTz('created_at').notNull().defaultNow(), resolvedAt: timestampTz('resolved_at'),
+}, (table) => [check('verification_issues_severity_allowed', sql`${table.severity} IN ('blocking','warning')`), check('verification_issues_status_allowed', sql`${table.status} IN ('open','resolved','dismissed')`), check('verification_issues_detail_object', sql`jsonb_typeof(${table.detail}) = 'object'`)]);
+
 export const webhookReceipts = pgTable('webhook_receipts', {
   provider: text('provider').notNull(), providerEventId: text('provider_event_id').notNull(), receivedAt: timestampTz('received_at').notNull().defaultNow(),
 }, (table) => [primaryKey({ columns: [table.provider, table.providerEventId] })]);

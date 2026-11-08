@@ -39,6 +39,8 @@ jobs:
       - run: pnpm lint
       - name: Provider-neutral ASR pipeline tests
         run: pnpm test:asr-pipeline
+      - name: Provider-neutral translation review tests
+        run: node --experimental-strip-types --test apps/api/test/translation-review-foundation.test.mjs packages/ai-providers/test/text.test.mjs
       - name: OpenAPI generation drift check
         run: pnpm openapi:check
       - name: OpenAPI route coverage tests
