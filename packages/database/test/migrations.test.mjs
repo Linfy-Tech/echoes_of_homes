@@ -65,7 +65,7 @@ async function database() {
 async function cleanExternalDatabase(pool) {
   await pool.query('RESET ROLE');
   await pool.query('DROP SCHEMA IF EXISTS drizzle CASCADE');
-  await pool.query('DROP TABLE IF EXISTS audit_events, auth_challenges, idempotency_keys, sessions, users, consent_records, consent_scope_grants, consent_scripts, custodian_designations, family_circles, family_memberships, invitations, persons, stories, story_roles, recordings, media_assets, processing_jobs, webhook_receipts, transcripts, transcript_segments, uncertainty_flags, model_runs, job_step_results, ai_usage_daily, transcript_revisions, family_glossary_terms, notifications CASCADE');
+  await pool.query('DROP TABLE IF EXISTS audit_events, auth_challenges, idempotency_keys, sessions, users, consent_records, consent_scope_grants, consent_scripts, custodian_designations, family_circles, family_memberships, invitations, persons, stories, story_roles, recordings, media_assets, processing_jobs, webhook_receipts, transcripts, transcript_segments, uncertainty_flags, model_runs, job_step_results, ai_usage_daily, transcript_revisions, family_glossary_terms, notifications, translations, translation_segments, verification_reports, verification_issues CASCADE');
   const roles = await pool.query("SELECT rolname FROM pg_roles WHERE rolname IN ('eoh_app','eoh_migrator') ORDER BY rolname");
   for (const { rolname } of roles.rows) {
     await pool.query(`DROP OWNED BY ${rolname}`);
@@ -129,7 +129,7 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
     try {
       await rollbackClient.query('BEGIN');
       await rollbackClient.query(migrationSql());
-    assert.deepEqual(await publicTables(rollbackClient), ['ai_usage_daily', 'audit_events', 'auth_challenges', 'consent_records', 'consent_scope_grants', 'consent_scripts', 'custodian_designations', 'family_circles', 'family_glossary_terms', 'family_memberships', 'idempotency_keys', 'invitations', 'job_step_results', 'media_assets', 'model_runs', 'notifications', 'persons', 'processing_jobs', 'recordings', 'sessions', 'stories', 'story_roles', 'transcript_revisions', 'transcript_segments', 'transcripts', 'uncertainty_flags', 'users', 'webhook_receipts']);
+    assert.deepEqual(await publicTables(rollbackClient), ['ai_usage_daily', 'audit_events', 'auth_challenges', 'consent_records', 'consent_scope_grants', 'consent_scripts', 'custodian_designations', 'family_circles', 'family_glossary_terms', 'family_memberships', 'idempotency_keys', 'invitations', 'job_step_results', 'media_assets', 'model_runs', 'notifications', 'persons', 'processing_jobs', 'recordings', 'sessions', 'stories', 'story_roles', 'transcript_revisions', 'transcript_segments', 'transcripts', 'translation_segments', 'translations', 'uncertainty_flags', 'users', 'verification_issues', 'verification_reports', 'webhook_receipts']);
     } finally {
       await rollbackClient.query('ROLLBACK');
       rollbackClient.release();
@@ -138,7 +138,7 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
     assert.equal((await pool.query("SELECT count(*)::int AS count FROM pg_roles WHERE rolname IN ('eoh_app','eoh_migrator')")).rows[0].count, 0);
 
     await migrate(drizzle(pool), { migrationsFolder: fileURLToPath(migrationsDirectory) });
-    assert.deepEqual(await publicTables(pool), ['ai_usage_daily', 'audit_events', 'auth_challenges', 'consent_records', 'consent_scope_grants', 'consent_scripts', 'custodian_designations', 'family_circles', 'family_glossary_terms', 'family_memberships', 'idempotency_keys', 'invitations', 'job_step_results', 'media_assets', 'model_runs', 'notifications', 'persons', 'processing_jobs', 'recordings', 'sessions', 'stories', 'story_roles', 'transcript_revisions', 'transcript_segments', 'transcripts', 'uncertainty_flags', 'users', 'webhook_receipts']);
+    assert.deepEqual(await publicTables(pool), ['ai_usage_daily', 'audit_events', 'auth_challenges', 'consent_records', 'consent_scope_grants', 'consent_scripts', 'custodian_designations', 'family_circles', 'family_glossary_terms', 'family_memberships', 'idempotency_keys', 'invitations', 'job_step_results', 'media_assets', 'model_runs', 'notifications', 'persons', 'processing_jobs', 'recordings', 'sessions', 'stories', 'story_roles', 'transcript_revisions', 'transcript_segments', 'transcripts', 'translation_segments', 'translations', 'uncertainty_flags', 'users', 'verification_issues', 'verification_reports', 'webhook_receipts']);
     const constraintClient = await pool.connect();
     try {
       await constraintClient.query('SET ROLE eoh_app');
@@ -148,6 +148,52 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
         'placeholder scripts must not be approved or published at the DB layer',
       );
       await constraintClient.query('RESET ROLE');
+      const dbGateUser = '018f3c1e-0000-7000-8000-000000000101';
+      const dbGateCircle = '018f3c1e-0000-7000-8000-000000000102';
+      const dbGatePerson = '018f3c1e-0000-7000-8000-000000000103';
+      const dbGateStory = '018f3c1e-0000-7000-8000-000000000104';
+      const dbGateJob = '018f3c1e-0000-7000-8000-000000000105';
+      const dbGateTranscript = '018f3c1e-0000-7000-8000-000000000106';
+      const dbGateTranslation = '018f3c1e-0000-7000-8000-000000000107';
+      await constraintClient.query(
+        "INSERT INTO users (id,email,email_lookup_hash,display_name) VALUES ($1,$2,$3,'DB gate user')",
+        [dbGateUser, Buffer.from('db-gate@example.invalid'), Buffer.alloc(32, 101)],
+      );
+      await constraintClient.query(
+        "INSERT INTO family_circles (id,name,created_by_user_id) VALUES ($1,'DB gate circle',$2)",
+        [dbGateCircle, dbGateUser],
+      );
+      await constraintClient.query(
+        "INSERT INTO persons (id,display_name,created_by_user_id) VALUES ($1,$2,$3)",
+        [dbGatePerson, Buffer.from('DB gate storyteller'), dbGateUser],
+      );
+      await constraintClient.query(
+        "INSERT INTO stories (id,family_circle_id,storyteller_person_id,rights_holder_person_id,created_by_user_id) VALUES ($1,$2,$3,$3,$4)",
+        [dbGateStory, dbGateCircle, dbGatePerson, dbGateUser],
+      );
+      await constraintClient.query(
+        "INSERT INTO processing_jobs (id,story_id,type,input_ref,correlation_id,idempotency_key) VALUES ($1,$2,'asr',$3,'db-gate-correlation','db-gate-idempotency')",
+        [dbGateJob, dbGateStory, {}],
+      );
+      await constraintClient.query(
+        "INSERT INTO transcripts (id,story_id,version_number,status,asr_processing_job_id) VALUES ($1,$2,1,'machine_draft',$3)",
+        [dbGateTranscript, dbGateStory, dbGateJob],
+      );
+      await constraintClient.query('SET ROLE eoh_app');
+      await assert.rejects(
+        constraintClient.query(
+          "INSERT INTO translations (id,story_id,source_transcript_id) VALUES ($1,$2,$3)",
+          [dbGateTranslation, dbGateStory, dbGateTranscript],
+        ),
+        /translation_source_not_approved/,
+        'the DB must reject translation rows sourced from an unapproved transcript',
+      );
+      await constraintClient.query("UPDATE transcripts SET status='approved_for_translation' WHERE id=$1", [dbGateTranscript]);
+      await constraintClient.query(
+        "INSERT INTO translations (id,story_id,source_transcript_id) VALUES ($1,$2,$3)",
+        [dbGateTranslation, dbGateStory, dbGateTranscript],
+      );
+      await constraintClient.query('RESET ROLE');
     } finally {
       constraintClient.release();
     }
@@ -155,7 +201,7 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
     try {
       await migrator.query('SET ROLE eoh_migrator');
       await migrate(drizzle(migrator), { migrationsFolder: fileURLToPath(migrationsDirectory) });
-    assert.equal((await migrator.query("SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations")).rows[0].count, 6);
+    assert.equal((await migrator.query("SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations")).rows[0].count, 7);
       await migrator.query('RESET ROLE');
     } finally {
       migrator.release();

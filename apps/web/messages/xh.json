@@ -68,5 +68,12 @@
   "review.saved": "Uphononongo lwakho lugciniwe.",
   "review.complete": "Uphononongo lugqityiwe. Umnini webali angalivuma ngoku.",
   "review.unavailable": "Olu phononongo alufumaneki ngoku.",
-  "review.conflict": "Omnye umntu utshintshe le ndawo. Hlaziya uze ujonge utshintsho lwakho ngaphambi kokugcina."
+  "review.conflict": "Omnye umntu utshintshe le ndawo. Hlaziya uze ujonge utshintsho lwakho ngaphambi kokugcina.",
+  "translation.title": "Uphononongo lwenguqulelo",
+  "translation.blocking": "imiba yokuqinisekisa evalayo",
+  "translation.approve": "Vuma inguqulelo",
+  "translation.approved": "Inguqulelo ivunyiwe",
+  "translation.resolveBlocking": "Sombulula imiba evalayo yokuqinisekisa kuqala",
+  "translation.unavailable": "Inguqulelo ayifumaneki",
+  "translation.sourceSegment": "Icandelo lomthombo lesiXhosa"
 }
