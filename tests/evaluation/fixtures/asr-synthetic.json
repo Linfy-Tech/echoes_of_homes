@@ -1,0 +1,33 @@
+{
+  "dataset": {
+    "version": "synthetic-pipeline-v1",
+    "description": "Synthetic isiXhosa-like text fixture for harness verification only",
+    "sha256": "not-a-language-evaluation-dataset"
+  },
+  "references": [
+    { "sampleId": "s1", "text": "Molo tata, ndikhumbula ikhaya." },
+    { "sampleId": "s2", "text": "Sahamba eGqeberha ngentsasa." }
+  ],
+  "candidates": [
+    {
+      "id": "fake-perfect",
+      "provider": "fixture",
+      "model": "synthetic",
+      "costUsdPerMinute": 0,
+      "outputs": [
+        { "sampleId": "s1", "text": "Molo tata, ndikhumbula ikhaya.", "latencyMs": 120, "audioMinutes": 0.5 },
+        { "sampleId": "s2", "text": "Sahamba eGqeberha ngentsasa.", "latencyMs": 140, "audioMinutes": 0.5 }
+      ]
+    },
+    {
+      "id": "fake-imperfect",
+      "provider": "fixture",
+      "model": "synthetic",
+      "costUsdPerMinute": 0.01,
+      "outputs": [
+        { "sampleId": "s1", "text": "Molo tata ndikhumbula ikhaya.", "latencyMs": 180, "audioMinutes": 0.5 },
+        { "sampleId": "s2", "text": "Sahamba eGqeberha ekuseni.", "latencyMs": 220, "audioMinutes": 0.5 }
+      ]
+    }
+  ]
+}

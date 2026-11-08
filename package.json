@@ -22,7 +22,8 @@
     "openapi:generate": "pnpm --filter @echoes-of-home/api openapi:generate",
     "openapi:check": "pnpm --filter @echoes-of-home/api openapi:check",
     "test:web-i18n": "pnpm --filter @echoes-of-home/web test:i18n",
-    "test:database-migrations": "pnpm --filter @echoes-of-home/database test:migrations"
+    "test:database-migrations": "pnpm --filter @echoes-of-home/database test:migrations",
+    "eval:asr": "node scripts/asr-eval.mjs"
   },
   "devDependencies": {
     "eslint": "10.14.0",
