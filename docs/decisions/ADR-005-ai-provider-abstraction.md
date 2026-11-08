@@ -1,6 +1,6 @@
 # ADR-005: Provider-neutral AI interfaces; models chosen by evaluation
 
-- **Status:** Accepted (abstraction) · Pending (provider/model selection after M0)
+- **Status:** Accepted (abstraction) · Provider selection blocked pending Echoes Eval Set v1
 - **Date:** 2026-11-04
 
 ## Context
@@ -16,7 +16,7 @@ Candidate providers include OpenAI (current recommended transcription model `gpt
 ## Selection record (to be completed after M0)
 | Role | Provider | Model ID | Settings | Eval report | Date |
 |---|---|---|---|---|---|
-| Listener (primary ASR) | TBD | TBD | TBD | TBD | TBD |
+| Listener (primary ASR) | TBD — provisional hosted lead: Google STT V2 `chirp_2`/`chirp_3` only because `xh-ZA` is documented; not selected | TBD | TBD | `tests/evaluation/reports/asr-2026-11-08.md` (no accuracy run) | 2026-11-08 |
 | Listener (secondary, optional) | TBD | | | | |
 | Context assistant | TBD | | | | |
 | Translator | TBD | | | | |
@@ -24,3 +24,25 @@ Candidate providers include OpenAI (current recommended transcription model `gpt
 
 ## Consequences
 Slightly more code than calling one SDK directly; in exchange we can benchmark, swap, and audit providers.
+
+## M0 benchmark outcome (2026-11-08)
+
+The repository has no real, consented isiXhosa audio or gold transcripts and
+no access to the separate evaluation store. Therefore no candidate has
+measured WER/CER, latency, entity accuracy, hallucination rate, uncertainty
+recall, or review-effort results. No paid provider calls were made.
+
+The provisional hosted lead is Google Cloud Speech-to-Text V2 because the
+current supported-language table documents `xh-ZA` and a `chirp_2` entry in
+`europe-west4`; this is a documentation-based lead, not a provider decision.
+OpenAI remains a controlled-test candidate, Meta Omnilingual ASR a
+self-hosted candidate, and Lelapa AI Vulavula a specialist candidate whose
+current STT language list and commercial terms still require confirmation.
+Azure standard STT is not currently listed for `xh-ZA` and is excluded unless
+Microsoft confirms support.
+
+Provider selection is blocked until Echoes Eval Set v1 is collected under
+separate research consent, annotated, run through the offline harness, and
+reviewed against `docs/ASR_BENCHMARK.md` §7. M4 can proceed only with the
+provider-neutral pipeline/fake adapter or a flagged provisional adapter and a
+mandatory re-evaluation step.
