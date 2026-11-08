@@ -15,6 +15,7 @@ class InMemoryM2Repository implements M2Repository {
   async getStory(storyId: string) { return this.stories.get(storyId) ?? null; }
   async getInvitation(id: string) { return this.invitations.get(id) ?? null; }
   async hasConsent(id: string) { return this.consents.has(id); }
+  async hasConsentEvidenceMedia(assetId: string) { return [...this.consents.values()].some((record) => record.evidenceMediaAssetId === assetId); }
   async activeConsentScopes(storyId: string) { const consent = [...this.consents.values()].find((record) => record.storyId === storyId); return new Set(Object.entries(consent?.scopes ?? {}).filter(([, granted]) => granted).map(([scope]) => scope)); }
   async linkPerson(personId: string, userId: string) { const person = this.persons.get(personId); if (!person) throw new Error('not_found'); person.linkedUserId = userId; }
   async addMembership(membership: M2Membership) { this.memberships.set(membership.id, membership); }
@@ -30,7 +31,9 @@ class InMemoryM2Repository implements M2Repository {
 export class M2FoundationService {
   private readonly allowPlaceholderConsent: boolean;
   private readonly repository: M2Repository;
-  constructor(options: { repository?: M2Repository; allowPlaceholderConsent?: boolean } = {}) { this.repository = options.repository ?? new InMemoryM2Repository(); this.allowPlaceholderConsent = options.allowPlaceholderConsent === true; }
+  private evidenceMediaResolver: ((assetId: string) => Promise<{ assetId: string; storyId: string; recordingId: string; verified: boolean; playable: boolean } | null>) | null;
+  constructor(options: { repository?: M2Repository; allowPlaceholderConsent?: boolean; evidenceMediaResolver?: (assetId: string) => Promise<{ assetId: string; storyId: string; recordingId: string; verified: boolean; playable: boolean } | null> } = {}) { this.repository = options.repository ?? new InMemoryM2Repository(); this.allowPlaceholderConsent = options.allowPlaceholderConsent === true; this.evidenceMediaResolver = options.evidenceMediaResolver ?? null; }
+  setEvidenceMediaResolver(resolver: (assetId: string) => Promise<{ assetId: string; storyId: string; recordingId: string; verified: boolean; playable: boolean } | null>) { this.evidenceMediaResolver = resolver; }
   createFamily(userId: string, name: string) { return this.repository.createFamily(userId, name); }
   listFamilies(userId: string) { return this.repository.listFamilies(userId); }
   createPerson(userId: string, input: { displayName: string; preferredLanguage: 'xh' | 'en' }) { return this.repository.createPerson(userId, input); }
@@ -38,7 +41,7 @@ export class M2FoundationService {
   getStory(storyId: string) { return this.repository.getStory(storyId); }
   invite(userId: string, input: { type: M2Invitation['type']; invitedEmail: string; familyCircleId?: string; storyId?: string; personId?: string }) { return this.repository.invite(userId, input); }
   acceptInvitation(id: string, userId: string) { return this.repository.acceptInvitation(id, userId); }
-  recordConsent(storyId: string, input: Omit<M2Consent, 'id' | 'storyId' | 'scriptVersion'> & { scriptVersion?: string }, actorUserId = '00000000-0000-0000-0000-000000000001') { if (input.method === 'assisted_verbal' && !input.evidenceMediaAssetId) throw new Error('validation_failed'); const scriptVersion = input.scriptVersion ?? placeholderConsentScript.version; if (scriptVersion.includes('placeholder') && !this.allowPlaceholderConsent) throw new Error('placeholder_consent_script_forbidden'); return this.repository.recordConsent(storyId, { ...input, scriptVersion }, actorUserId).then((consent) => ({ ...consent, script: placeholderConsentScript })); }
+  async recordConsent(storyId: string, input: Omit<M2Consent, 'id' | 'storyId' | 'scriptVersion'> & { scriptVersion?: string }, actorUserId = '00000000-0000-0000-0000-000000000001') { if (input.method === 'assisted_verbal') { if (!input.evidenceMediaAssetId) throw new Error('validation_failed'); const evidence = this.evidenceMediaResolver ? await this.evidenceMediaResolver(input.evidenceMediaAssetId) : null; if (!evidence) throw new Error('evidence_not_found'); if (!evidence.verified || !evidence.playable) throw new Error('evidence_unverified'); if (evidence.storyId !== storyId) throw new Error('evidence_story_mismatch'); if (await this.repository.hasConsentEvidenceMedia(input.evidenceMediaAssetId)) throw new Error('evidence_reused'); } const scriptVersion = input.scriptVersion ?? placeholderConsentScript.version; if (scriptVersion.includes('placeholder') && !this.allowPlaceholderConsent) throw new Error('placeholder_consent_script_forbidden'); return this.repository.recordConsent(storyId, { ...input, scriptVersion }, actorUserId).then((consent) => ({ ...consent, script: placeholderConsentScript })); }
   withdrawConsent(storyId: string, userId: string) { return this.repository.withdrawConsent(storyId, userId); }
   grantRole(storyId: string, userId: string, role: M2StoryRole['role'], grantedByUserId: string) { return this.repository.grantRole(storyId, userId, role, grantedByUserId); }
   circleRole(userId: string, familyCircleId: string): Promise<StoryResourceContext['actorCircleRole']> { return this.repository.circleRole(userId, familyCircleId); }

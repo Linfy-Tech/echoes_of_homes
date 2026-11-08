@@ -46,7 +46,7 @@ test('placeholder consent records are rejected without the explicit test opt-in'
   const family = await foundation.createFamily('user-1', 'Synthetic family');
   const person = await foundation.createPerson('user-1', { displayName: 'Synthetic storyteller', preferredLanguage: 'en' });
   const story = await foundation.createStory('user-1', { familyCircleId: family.id, storytellerPersonId: person.id });
-  assert.throws(() => foundation.recordConsent(story.id, {
+  await assert.rejects(foundation.recordConsent(story.id, {
     method: 'self_digital', evidenceMediaAssetId: null,
     comprehensionResult: { questions: 3, correct: 3, reexplained: false },
     rightsHolderChoice: 'self', scopes: {},
@@ -58,7 +58,7 @@ test('in-memory consent creation rejects assisted consent without evidence', asy
   const family = await foundation.createFamily('user-1', 'Synthetic family');
   const person = await foundation.createPerson('user-1', { displayName: 'Synthetic storyteller', preferredLanguage: 'en' });
   const story = await foundation.createStory('user-1', { familyCircleId: family.id, storytellerPersonId: person.id });
-  assert.throws(() => foundation.recordConsent(story.id, {
+  await assert.rejects(foundation.recordConsent(story.id, {
     method: 'assisted_verbal', evidenceMediaAssetId: null,
     comprehensionResult: { questions: 3, correct: 3, reexplained: false },
     rightsHolderChoice: 'custodian', scopes: {},
