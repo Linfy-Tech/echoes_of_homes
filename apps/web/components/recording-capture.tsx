@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { chooseRecorderMimeType } from '../lib/recording';
 
 type SavedChunk = { key: string; localId: string; index: number; blob: Blob };
-type SavedRecording = { localId: string; storyId: string; mimeType: string; chunks: number; uploadedRecordingId?: string; uploadId?: string; totalBytes?: number; confirmedBytes: number };
+type SavedRecording = { localId: string; storyId: string; mimeType: string; chunks: number; uploadedRecordingId?: string; uploadId?: string; mediaAssetId?: string; totalBytes?: number; confirmedBytes: number };
 const databaseName = 'echoes-of-home-recordings';
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -37,7 +37,7 @@ async function idbDeleteRecording(localId: string): Promise<void> {
   db.close();
 }
 
-export function RecordingCapture({ storyId: initialStoryId = '' }: { storyId?: string }) {
+export function RecordingCapture({ storyId: initialStoryId = '', purpose = 'story', prompt, onUploadComplete }: { storyId?: string; purpose?: 'story' | 'consent_evidence'; prompt?: string; onUploadComplete?: (result: { recordingId: string; mediaAssetId: string }) => void }) {
   const [storyId, setStoryId] = useState(initialStoryId);
   const [status, setStatus] = useState('idle');
   const [message, setMessage] = useState('');
@@ -74,13 +74,14 @@ export function RecordingCapture({ storyId: initialStoryId = '' }: { storyId?: s
     const audio = new Blob(saved, { type: recorder?.mimeType ?? recovery?.mimeType ?? 'audio/webm' });
     const bytes = new Uint8Array(await audio.arrayBuffer());
     let recordingId = recovery?.uploadedRecordingId; let uploadId = recovery?.uploadId;
-    if (!recordingId || !uploadId) { const response = await fetch(`/v1/stories/${storyId}/recordings`, { method: 'POST', headers: { 'content-type': 'application/json', origin: window.location.origin, 'x-requested-with': 'eoh-web' }, body: JSON.stringify({ source: 'browser_recording', sha256: bytesToHex(sha256(bytes)), sizeBytes: bytes.byteLength, mimeType: audio.type }) }); if (!response.ok) { setStatus('error'); setMessage('The server did not accept this recording. Check consent and try again.'); return; } const created = await response.json() as { recordingId: string; upload: { uploadId: string } }; recordingId = created.recordingId; uploadId = created.upload.uploadId; await idbPut('recordings', { localId: recovery?.localId ?? crypto.randomUUID(), storyId, mimeType: audio.type, chunks: saved.length, totalBytes: bytes.byteLength, confirmedBytes: 0, uploadedRecordingId: recordingId, uploadId }); }
+    let mediaAssetId: string | undefined = recovery?.mediaAssetId;
+    if (!recordingId || !uploadId) { const response = await fetch(`/v1/stories/${storyId}/recordings`, { method: 'POST', headers: { 'content-type': 'application/json', origin: window.location.origin, 'x-requested-with': 'eoh-web' }, body: JSON.stringify({ source: 'browser_recording', purpose, sha256: bytesToHex(sha256(bytes)), sizeBytes: bytes.byteLength, mimeType: audio.type }) }); if (!response.ok) { setStatus('error'); setMessage('The server did not accept this recording. Check consent and try again.'); return; } const created = await response.json() as { recordingId: string; mediaAssetId: string; upload: { uploadId: string } }; recordingId = created.recordingId; uploadId = created.upload.uploadId; mediaAssetId = created.mediaAssetId; await idbPut('recordings', { localId: recovery?.localId ?? crypto.randomUUID(), storyId, mimeType: audio.type, chunks: saved.length, totalBytes: bytes.byteLength, confirmedBytes: 0, uploadedRecordingId: recordingId, uploadId, mediaAssetId }); }
     let offset = recovery?.confirmedBytes ?? 0; const chunkSize = 5_000_000;
     for (; offset < bytes.byteLength;) { const end = Math.min(offset + chunkSize, bytes.byteLength); const chunk = bytes.subarray(offset, end); let uploaded: Response; try { uploaded = await fetch(`/v1/recordings/${recordingId}/chunks`, { method: 'POST', headers: { 'content-type': 'application/octet-stream', origin: window.location.origin, 'x-requested-with': 'eoh-web', 'x-upload-id': uploadId, 'content-range': `bytes ${offset}-${end - 1}/${bytes.byteLength}` }, body: chunk }); } catch { setStatus('error'); setMessage('Upload paused. Reload to retry the unfinished recording.'); return; } if (!uploaded.ok) { setStatus('error'); setMessage('Upload paused. Reload to retry the unfinished recording.'); return; } offset = end; if (recovery) await idbPut('recordings', { ...recovery, totalBytes: bytes.byteLength, confirmedBytes: offset, uploadedRecordingId: recordingId, uploadId }); }
     const completed = await fetch(`/v1/recordings/${recordingId}/complete`, { method: 'POST', headers: { origin: window.location.origin, 'x-requested-with': 'eoh-web' } });
     if (!completed.ok) { setStatus('error'); setMessage('Upload is incomplete; your local recording remains available.'); return; }
-    setStatus('uploaded'); setMessage('Upload complete. Verification is in progress.'); if (recovery) await idbDeleteRecording(recovery.localId); setRecovery(null);
+    setStatus('uploaded'); setMessage('Upload complete. Verification is in progress.'); if (onUploadComplete && recordingId && mediaAssetId) onUploadComplete({ recordingId, mediaAssetId }); if (recovery) await idbDeleteRecording(recovery.localId); setRecovery(null);
   };
 
-  return <section aria-labelledby="recording-title"><h1 id="recording-title">Record a story</h1><label>Story ID<input value={storyId} onChange={(event) => setStoryId(event.target.value)} placeholder="Story UUID" /></label><p role="status">{message}</p>{recovery && <button type="button" onClick={() => setRecovery(null)}>Start a new recording</button>}{status === 'recording' ? <button type="button" onClick={() => void stopAndUpload()}>Stop and upload</button> : <button type="button" onClick={() => void start()} disabled={status === 'preparing'}>{recovery ? 'Resume recording' : 'Start recording'}</button>}</section>;
+  return <section aria-labelledby="recording-title"><h1 id="recording-title">{purpose === 'consent_evidence' ? 'Record verbal consent' : 'Record a story'}</h1>{prompt && <p>{prompt}</p>}<label>Story ID<input value={storyId} onChange={(event) => setStoryId(event.target.value)} placeholder="Story UUID" /></label><p role="status">{message}</p>{recovery && <button type="button" onClick={() => setRecovery(null)}>Start a new recording</button>}{status === 'recording' ? <button type="button" onClick={() => void stopAndUpload()}>Stop and upload</button> : <button type="button" onClick={() => void start()} disabled={status === 'preparing'}>{recovery ? 'Resume recording' : 'Start recording'}</button>}</section>;
 }

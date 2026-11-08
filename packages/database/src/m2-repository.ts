@@ -23,6 +23,7 @@ export type M2Repository = {
   getStory(storyId: string): Promise<M2Story | null>;
   getInvitation(id: string): Promise<M2Invitation | null>;
   hasConsent(id: string): Promise<boolean>;
+  hasConsentEvidenceMedia(assetId: string): Promise<boolean>;
   activeConsentScopes(storyId: string): Promise<ReadonlySet<string>>;
   linkPerson(personId: string, userId: string): Promise<void>;
   addMembership(membership: M2Membership): Promise<void>;
@@ -59,6 +60,7 @@ export class DrizzleM2Repository implements M2Repository {
   async getStory(storyId: string) { const rows = await this.db.select().from(schema.stories).where(eq(schema.stories.id, storyId)); const row = rows[0]; return row ? { id: row.id, familyCircleId: row.familyCircleId, storytellerPersonId: row.storytellerPersonId, rightsHolderPersonId: row.rightsHolderPersonId, createdByUserId: row.createdByUserId, title: row.title ? decryptedText(row.title, this.fieldKey) : null, status: 'draft' as const, audience: 'private' as const } : null; }
   async getInvitation(id: string) { const rows = await this.db.select().from(schema.invitations).where(eq(schema.invitations.id, id)); const row = rows[0]; return row ? { id: row.id, type: row.type as M2Invitation['type'], familyCircleId: row.familyCircleId, storyId: row.storyId, personId: row.personId, invitedEmail: '', token: '', createdByUserId: row.createdByUserId, status: row.status as M2Invitation['status'] } : null; }
   async hasConsent(id: string) { const rows = await this.db.select({ id: schema.consentRecords.id }).from(schema.consentRecords).where(eq(schema.consentRecords.id, id)); return Boolean(rows[0]); }
+  async hasConsentEvidenceMedia(assetId: string) { const rows = await this.db.select({ id: schema.consentRecords.id }).from(schema.consentRecords).where(eq(schema.consentRecords.evidenceMediaAssetId, assetId)); return Boolean(rows[0]); }
   async activeConsentScopes(storyId: string) { const rows = await this.db.select({ scope: schema.consentScopeGrants.scope }).from(schema.consentRecords).innerJoin(schema.consentScopeGrants, eq(schema.consentScopeGrants.consentRecordId, schema.consentRecords.id)).where(and(eq(schema.consentRecords.storyId, storyId), eq(schema.consentRecords.status, 'active'), eq(schema.consentScopeGrants.granted, true))); return new Set(rows.map((row) => row.scope)); }
   async linkPerson(personId: string, userId: string) { await this.transaction(async (tx, client) => { await tx.update(schema.persons).set({ linkedUserId: userId, updatedAt: new Date() }).where(eq(schema.persons.id, personId)); await this.audit(client, userId, 'person', 'link_account', personId); }); }
   async addMembership(membership: M2Membership) { await this.transaction(async (tx, client) => { await tx.insert(schema.familyMemberships).values(membership); await this.audit(client, membership.userId, 'family_membership', 'create', membership.id); }); }

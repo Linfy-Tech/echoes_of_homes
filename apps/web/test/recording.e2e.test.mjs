@@ -43,3 +43,50 @@ test('recording upload resumes after an interrupted throttled browser request', 
     assert.match(await page.getByText('Upload complete. Verification is in progress.', { exact: true }).innerText(), /Verification/);
   } finally { await browser.close(); }
 });
+
+test('S-25 records, uploads, waits for verified evidence, and creates assisted consent', { skip: process.env.RUN_PLAYWRIGHT !== '1' }, async () => {
+  let playwright;
+  try { playwright = await import('@playwright/test'); } catch { throw new Error('RUN_PLAYWRIGHT=1 requires @playwright/test and its browser binaries'); }
+  const browser = await playwright.chromium.launch();
+  try {
+    const context = await browser.newContext({ permissions: ['microphone'] });
+    const page = await context.newPage();
+    await page.addInitScript(() => {
+      class FakeMediaRecorder {
+        static isTypeSupported() { return true; }
+        state = 'inactive';
+        mimeType = 'audio/webm';
+        ondataavailable = null;
+        onstop = null;
+        start() { this.state = 'recording'; }
+        stop() { this.state = 'inactive'; this.ondataavailable?.({ data: new Blob(['synthetic-consent-audio'], { type: this.mimeType }) }); this.onstop?.(); }
+      }
+      globalThis.MediaRecorder = FakeMediaRecorder;
+      navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop() {} }] });
+    });
+    const recordingId = '00000000-0000-0000-0000-000000000012';
+    const mediaAssetId = '00000000-0000-0000-0000-000000000013';
+    const uploadId = 'consent-upload-id';
+    let statusChecks = 0;
+    await page.route('**/v1/stories/*/recordings', async (route) => route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ recordingId, mediaAssetId, upload: { uploadId, chunkSizeBytes: 5000000, expiresAt: new Date(Date.now() + 3600000).toISOString() } }) }));
+    await page.route('**/v1/recordings/*/chunks', async (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ recordingId, status: 'pending_upload', done: true, bytes: 22 }) }));
+    await page.route('**/v1/recordings/*/complete', async (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ recordingId, status: 'uploaded', jobId: 'consent-job-id' }) }));
+    await page.route('**/v1/recordings/*', async (route) => {
+      const url = route.request().url();
+      if (url.endsWith('/chunks')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ recordingId, status: 'pending_upload', done: true, bytes: 22 }) });
+      if (url.endsWith('/complete')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ recordingId, status: 'uploaded', jobId: 'consent-job-id' }) });
+      statusChecks += 1;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ recordingId, mediaAssetId, status: statusChecks === 1 ? 'uploaded' : 'verified' }) });
+    });
+    let consentBody;
+    await page.route('**/v1/stories/*/consent', async (route) => { consentBody = route.request().postDataJSON(); return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'consent-record-id', evidenceMediaAssetId: consentBody.evidenceMediaAssetId }) }); });
+    const storyId = '00000000-0000-0000-0000-000000000014';
+    await page.goto(`${process.env.EOH_WEB_URL ?? 'http://localhost:3000'}/consent/${storyId}`);
+    await page.getByText('Consent script: This is a placeholder consent script for testing.', { exact: false }).waitFor();
+    await page.getByRole('button', { name: 'Start recording' }).click();
+    await page.getByRole('button', { name: 'Stop and upload' }).click();
+    await page.getByText('Verbal consent saved with verified evidence.').waitFor({ timeout: 5000 });
+    assert.equal(consentBody.method, 'assisted_verbal');
+    assert.equal(consentBody.evidenceMediaAssetId, mediaAssetId);
+  } finally { await browser.close(); }
+});
