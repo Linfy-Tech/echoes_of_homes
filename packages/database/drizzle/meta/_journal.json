@@ -57,6 +57,13 @@
       "when": 1794002200000,
       "tag": "0007_final_approval_reader_sharing",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794002300000,
+      "tag": "0008_authoritative_workflow_contracts",
+      "breakpoints": true
     }
   ]
 }

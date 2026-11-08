@@ -16,7 +16,7 @@ export class FakeTextModelProvider implements TextModelProvider {
   }
 }
 
-export type TranslationStatus = 'machine_draft' | 'in_review' | 'approved' | 'rejected';
+export type TranslationStatus = 'generating' | 'machine_draft' | 'verifying' | 'in_review' | 'approved' | 'superseded' | 'rejected' | 'failed';
 export type TranslationSegment = { id: string; translationId: string; sourceSegmentId: string; closeText: string; naturalText: string; machineCloseText: string; machineNaturalText: string; renderMode: 'normal' | 'unclear_marker' | 'inaudible_marker'; reviewState: 'unreviewed' | 'reviewed' | 'edited'; version: number };
 export type VerificationIssue = { id: string; translationSegmentId: string | null; checkId: string; severity: 'blocking' | 'warning'; detail: string; status: 'open' | 'resolved' | 'dismissed' };
 export type VerificationReport = { id: string; translationId: string; status: 'complete' | 'incomplete'; checksRun: string[]; issues: VerificationIssue[] };
@@ -41,7 +41,10 @@ export class TranslationReviewFoundation {
     const translationId = randomUUID();
     const requestSegments: TranslationInputSegment[] = input.transcript.segments.filter((segment) => segment.reviewState !== 'excluded').map((segment) => ({ segmentId: segment.id, sourceText: segment.text, glossaryTerms: input.glossaryTerms ?? [], renderMode: markerFor(segment.reviewState) }));
     const schema = { parse(value: unknown): Array<{ segmentId: string; close: string; natural: string; preservedTerms: string[] }> { if (!Array.isArray(value)) throw new Error('translation_schema_invalid'); return value as Array<{ segmentId: string; close: string; natural: string; preservedTerms: string[] }>; } };
-    const result = await provider.generateStructured({ operation: 'translate', data: { segments: requestSegments }, schema, temperature: 0, modelId: provider.modelId, promptId: 'translator', promptVersion: '1.0.0' });
+    const translation: Translation = { id: translationId, storyId: input.transcript.storyId, sourceTranscriptId: input.transcript.id, status: 'generating', version: 1, segments: [], report: null };
+    this.store.translations.set(translationId, translation);
+    try {
+      const result = await provider.generateStructured({ operation: 'translate', data: { segments: requestSegments }, schema, temperature: 0, modelId: provider.modelId, promptId: 'translator', promptVersion: '1.0.0' });
     const byId = new Map(result.output.map((item) => [item.segmentId, item]));
     if (byId.size !== requestSegments.length || requestSegments.some((segment) => !byId.has(segment.segmentId))) throw new TranslationDomainError('alignment_incomplete');
     for (const source of requestSegments) {
@@ -50,11 +53,16 @@ export class TranslationReviewFoundation {
       if (requiredTerms.some((term) => !output.close.includes(term) || !output.natural.includes(term))) throw new TranslationDomainError('validation_failed', 'marker_not_preserved');
       if (source.renderMode !== 'normal' && (!output.close.includes('[') || !output.natural.includes('['))) throw new TranslationDomainError('validation_failed', 'uncertainty_marker_missing');
     }
-    const translation: Translation = { id: translationId, storyId: input.transcript.storyId, sourceTranscriptId: input.transcript.id, status: 'machine_draft', version: 1, segments: requestSegments.map((source) => { const output = byId.get(source.segmentId)!; return { id: randomUUID(), translationId, sourceSegmentId: source.segmentId, closeText: output.close, naturalText: output.natural, machineCloseText: output.close, machineNaturalText: output.natural, renderMode: source.renderMode, reviewState: 'unreviewed', version: 1 }; }), report: null };
-    this.store.translations.set(translationId, translation);
-    await this.verify(translationId, provider);
-    translation.status = 'in_review';
-    return translation;
+      translation.status = 'machine_draft';
+      translation.segments = requestSegments.map((source) => { const output = byId.get(source.segmentId)!; return { id: randomUUID(), translationId, sourceSegmentId: source.segmentId, closeText: output.close, naturalText: output.natural, machineCloseText: output.close, machineNaturalText: output.natural, renderMode: source.renderMode, reviewState: 'unreviewed', version: 1 }; });
+      translation.status = 'verifying';
+      await this.verify(translationId, provider);
+      translation.status = 'in_review';
+      return translation;
+    } catch (error) {
+      translation.status = 'failed';
+      throw error;
+    }
   }
 
   async verify(translationId: string, provider: TextModelProvider = new FakeTextModelProvider()): Promise<VerificationReport> {
@@ -76,6 +84,6 @@ export class TranslationReviewFoundation {
 
   editSegment(actorUserId: string, translationId: string, segmentId: string, expectedVersion: number, closeText: string, naturalText: string): TranslationSegment { void actorUserId; const translation = this.get(translationId); const segment = translation.segments.find((item) => item.id === segmentId); if (!segment) throw new TranslationDomainError('not_found'); if (segment.version !== expectedVersion) throw new TranslationDomainError('conflict'); if (!closeText.trim() || !naturalText.trim()) throw new TranslationDomainError('validation_failed'); segment.closeText = closeText; segment.naturalText = naturalText; segment.reviewState = 'edited'; segment.version += 1; translation.version += 1; return segment; }
   resolveIssue(issueId: string, status: 'resolved' | 'dismissed', reason?: string): VerificationIssue { for (const report of this.store.reports.values()) { const issue = report.issues.find((item) => item.id === issueId); if (issue) { if (status === 'dismissed' && !reason?.trim()) throw new TranslationDomainError('validation_failed', 'dismiss_reason_required'); issue.status = status; return issue; } } throw new TranslationDomainError('not_found'); }
-  approve(actorUserId: string, translationId: string): Translation { void actorUserId; const translation = this.get(translationId); if (translation.status !== 'in_review') throw new TranslationDomainError('validation_failed'); if (translation.report?.issues.some((issue) => issue.severity === 'blocking' && issue.status === 'open')) throw new TranslationDomainError('blocking_issues'); translation.status = 'approved'; translation.version += 1; return translation; }
+  approve(actorUserId: string, translationId: string): Translation { void actorUserId; const translation = this.get(translationId); if (translation.status !== 'in_review') throw new TranslationDomainError('validation_failed'); if (translation.report?.issues.some((issue) => issue.severity === 'blocking' && issue.status === 'open')) throw new TranslationDomainError('blocking_issues'); for (const item of this.store.translations.values()) if (item.sourceTranscriptId === translation.sourceTranscriptId && item.id !== translation.id && item.status === 'approved') item.status = 'superseded'; translation.status = 'approved'; translation.version += 1; return translation; }
   get(translationId: string): Translation { const translation = this.store.translations.get(translationId); if (!translation) throw new TranslationDomainError('not_found'); return translation; }
 }

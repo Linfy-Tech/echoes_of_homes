@@ -13,6 +13,12 @@
   "nav.profile": "Profile",
   "nav.sessions": "Sessions",
   "nav.intro": "How it works",
+  "nav.families": "Families",
+  "nav.record": "Record",
+  "nav.transcription": "Transcription",
+  "nav.review": "Review",
+  "nav.translation": "Translation",
+  "nav.story": "Story reader",
   "home.welcome": "Welcome home",
   "home.description": "Your family stories will live here. This shell uses preview data until the API is connected.",
   "home.signInPrompt": "Sign in to continue",
@@ -90,5 +96,12 @@
   "story.audienceChanged": "Sharing setting updated",
   "story.audienceBlocked": "Family sharing needs the right consent and approval",
   "story.accessDenied": "This story is not available to you",
-  "story.unavailable": "Story unavailable"
+  "story.unavailable": "Story unavailable",
+  "families.title": "Families and storytellers",
+  "families.description": "Create a family circle, then add a storyteller and story.",
+  "families.name": "Family name",
+  "families.create": "Create family",
+  "families.loading": "Loading families…",
+  "families.empty": "No family circles yet.",
+  "families.error": "We could not load or save your family circle. Check your connection and sign-in."
 }

@@ -35,6 +35,8 @@ type Story = {
   transcriptHash: string;
   translationHash: string | null;
   versions: FinalStoryVersion[];
+  transcriptId: string | null;
+  translationId: string | null;
 };
 
 export class FinalStoryDomainError extends Error {
@@ -49,7 +51,7 @@ export class FinalApprovalReaderSharing {
 
   constructor(options: { publicSharingEnabled?: boolean } = {}) { this.publicSharingEnabled = options.publicSharingEnabled === true; }
 
-  registerStory(input: { storyId: string; familyCircleId: string; storytellerUserId: string | null; rightsHolderUserId: string; custodianRightsHolder?: boolean; transcriptApproved?: boolean; translationApproved?: boolean; consentScopes?: Iterable<ConsentScope>; isiXhosaText?: string; englishText?: string | null; audioAssetId?: string; transcriptHash?: string; translationHash?: string | null }): Story {
+  registerStory(input: { storyId: string; familyCircleId: string; storytellerUserId: string | null; rightsHolderUserId: string; custodianRightsHolder?: boolean; transcriptApproved?: boolean; translationApproved?: boolean; consentScopes?: Iterable<ConsentScope>; isiXhosaText?: string; englishText?: string | null; audioAssetId?: string; transcriptHash?: string; translationHash?: string | null; transcriptId?: string; translationId?: string | null }): Story {
     const story: Story = {
       id: input.storyId, familyCircleId: input.familyCircleId, storytellerUserId: input.storytellerUserId, rightsHolderUserId: input.rightsHolderUserId,
       custodianRightsHolder: input.custodianRightsHolder ?? false, status: 'final_review', audience: 'private', consentScopes: new Set(input.consentScopes ?? []),
@@ -57,6 +59,7 @@ export class FinalApprovalReaderSharing {
       translationApproved: input.translationApproved ?? false, isiXhosaText: input.isiXhosaText ?? '', englishText: input.englishText ?? null,
       audioAssetId: input.audioAssetId ?? `audio-${input.storyId}`, transcriptHash: input.transcriptHash ?? createHash('sha256').update(input.isiXhosaText ?? '').digest('hex'),
       translationHash: input.translationHash ?? null, versions: [],
+      transcriptId: input.transcriptId ?? null, translationId: input.translationId ?? null,
     };
     this.stories.set(story.id, story); return story;
   }
@@ -72,8 +75,9 @@ export class FinalApprovalReaderSharing {
     return story.versions[story.versions.length - 1] ?? { ...story, versions: [] };
   }
 
-  approveFinal(actorUserId: string, storyId: string): FinalStoryVersion {
+  approveFinal(actorUserId: string, storyId: string, input?: { transcriptId: string; translationId: string | null; confirm: true }): FinalStoryVersion {
     const story = this.story(storyId); if (story.rightsHolderUserId !== actorUserId) throw new FinalStoryDomainError('forbidden');
+    if (input && (!input.confirm || input.transcriptId !== story.transcriptId || input.translationId !== story.translationId)) throw new FinalStoryDomainError('conflict', 'approval_sources_mismatch');
     if (story.status !== 'final_review' || !story.transcriptApproved || (!story.translationApproved && story.englishText !== null && story.consentScopes.has('translation'))) throw new FinalStoryDomainError('invalid_state_transition');
     const previous = story.versions.at(-1); if (previous) previous.status = 'superseded';
     const occurredAt = new Date().toISOString();
