@@ -6,9 +6,13 @@
     "typecheck": "tsc --build --pretty false"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./cloudinary": "./src/adapters/cloudinary.ts"
   },
   "devDependencies": {
     "@types/node": "24.10.0"
+  },
+  "dependencies": {
+    "cloudinary": "2.7.0"
   }
 }

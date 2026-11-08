@@ -10,11 +10,13 @@
     "start": "next start"
   },
   "dependencies": {
+    "@noble/hashes": "2.0.1",
     "next": "15.5.29",
     "react": "19.1.1",
     "react-dom": "19.1.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.0",
     "@types/node": "24.10.0",
     "@types/react": "19.1.13",
     "@types/react-dom": "19.1.9"

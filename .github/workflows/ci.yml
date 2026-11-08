@@ -31,6 +31,8 @@ jobs:
       - name: Verify Node runtime
         run: node --version
       - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm --filter @echoes-of-home/web exec playwright install --with-deps chromium
       - name: Dependency vulnerability audit
         run: pnpm audit --audit-level high
       - run: pnpm typecheck
@@ -43,6 +45,28 @@ jobs:
         run: pnpm test
       - name: Web translation catalogue parity
         run: pnpm test:web-i18n
+      - name: Build web for recording e2e
+        run: pnpm --filter @echoes-of-home/web build
+      - name: Start web for recording e2e
+        run: |
+          pnpm --filter @echoes-of-home/web exec next start --hostname 127.0.0.1 --port 3000 > /tmp/echoes-web.log 2>&1 &
+          web_pid=$!
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/record; then
+              exit 0
+            fi
+            if ! kill -0 "$web_pid" 2>/dev/null; then
+              echo "Web server exited before becoming ready; log follows:"
+              cat /tmp/echoes-web.log
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "Web server did not become ready; log follows:"
+          cat /tmp/echoes-web.log
+          exit 1
+      - name: Recording upload resume e2e (Playwright)
+        run: pnpm --filter @echoes-of-home/web exec env RUN_PLAYWRIGHT=1 node --experimental-strip-types --test test/recording.e2e.test.mjs
       - name: Authorization policy matrix
         run: pnpm test:policy
       - name: Auth storage compatibility (disposable PostgreSQL 16)

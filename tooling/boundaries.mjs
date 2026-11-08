@@ -24,7 +24,7 @@ const external = {
   database: ['@testcontainers/postgresql', 'drizzle-orm', 'drizzle-kit', 'pg'],
   api: ['fastify', '@fastify/cookie', '@fastify/csrf-protection', '@fastify/helmet', '@fastify/rate-limit', '@fastify/swagger', '@fastify/type-provider-zod', 'zod', 'pg', 'better-auth'],
   observability: ['@opentelemetry/api', '@opentelemetry/api-logs', '@opentelemetry/exporter-logs-otlp-proto', '@opentelemetry/exporter-metrics-otlp-proto', '@opentelemetry/exporter-trace-otlp-proto', '@opentelemetry/resources', '@opentelemetry/sdk-logs', '@opentelemetry/sdk-metrics', '@opentelemetry/sdk-node'],
-  web: ['next', 'react', 'react-dom'],
+  web: ['next', 'react', 'react-dom', '@noble/hashes', '@playwright/test'],
 };
 const providers = /^(openai|cloudinary|@google-cloud\/[^/]+|@anthropic-ai\/[^/]+|@nebius\/[^/]+|@huggingface\/[^/]+|replicate|@aws-sdk\/[^/]+)(\/|$)/;
 
@@ -55,7 +55,7 @@ export default {
         if (from !== adapter || !file.startsWith(`packages/${adapter}/src/adapters/`)) return deny(node, `Provider SDKs belong in ${adapter}/src/adapters/.`);
       }
       if (!to && !specifier.startsWith('.')) {
-        const builtin = specifier.startsWith('node:') && !['web', 'shared-types', 'validation', 'agent-workflows'].includes(from);
+        const builtin = specifier.startsWith('node:') && !['shared-types', 'validation', 'agent-workflows'].includes(from);
         const adapter = ['ai-providers', 'media-storage'].includes(from) && file.startsWith(`packages/${from}/src/adapters/`);
         if (!builtin && !adapter && !external[from]?.some((pkg) => specifier === pkg || specifier.startsWith(pkg + '/'))) return deny(node, `External import ${specifier} requires a boundary review for ${from}.`);
       }
