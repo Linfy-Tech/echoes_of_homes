@@ -76,4 +76,19 @@
   "translation.resolveBlocking": "Sombulula imiba evalayo yokuqinisekisa kuqala",
   "translation.unavailable": "Inguqulelo ayifumaneki",
   "translation.sourceSegment": "Icandelo lomthombo lesiXhosa"
+  ,"story.title": "Ibali lakho elivunyiweyo",
+  "story.preview": "Jonga kuqala",
+  "story.noPreview": "Khetha ibali ukuze ujonge kuqala.",
+  "story.reader": "Umfundi",
+  "story.audio": "Isandi sebali",
+  "story.provenance": "Indlela eli bali elilungiswe ngayo",
+  "story.sharing": "Izicwangciso zokwabelana",
+  "story.keepPrivate": "Gcina liyimfihlo",
+  "story.shareFamily": "Yabelana nosapho",
+  "story.sharePublic": "Yabelana esidlangalaleni",
+  "story.openReader": "Vula umfundi",
+  "story.audienceChanged": "Isicwangciso sokwabelana sihlaziyiwe",
+  "story.audienceBlocked": "Ukwabelana nosapho kufuna imvume efanelekileyo kunye nokuvunywa",
+  "story.accessDenied": "Eli bali alifumaneki kuwe",
+  "story.unavailable": "Ibali alifumaneki"
 }

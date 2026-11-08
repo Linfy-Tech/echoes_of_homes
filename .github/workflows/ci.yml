@@ -41,6 +41,8 @@ jobs:
         run: pnpm test:asr-pipeline
       - name: Provider-neutral translation review tests
         run: node --experimental-strip-types --test apps/api/test/translation-review-foundation.test.mjs packages/ai-providers/test/text.test.mjs
+      - name: Final approval reader sharing tests
+        run: node --experimental-strip-types --test apps/api/test/final-approval-reader-sharing.test.mjs
       - name: OpenAPI generation drift check
         run: pnpm openapi:check
       - name: OpenAPI route coverage tests

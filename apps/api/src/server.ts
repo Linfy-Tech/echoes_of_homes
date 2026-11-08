@@ -18,6 +18,8 @@ import { createMediaFoundation, MediaDomainError, type MediaFoundation } from '.
 import { createCloudinaryMediaStorageFromEnv } from '@echoes-of-home/media-storage/cloudinary';
 import { ReviewDomainError, TranscriptReviewFoundation } from './transcript-review-foundation.ts';
 import { TranslationDomainError, TranslationReviewFoundation } from './translation-review-foundation.ts';
+import { parseEnv } from '@echoes-of-home/validation/env';
+import { FinalApprovalReaderSharing, FinalStoryDomainError } from './final-approval-reader-sharing.ts';
 
 const challengeSchema = z.object({ email: z.string().email().max(320), uiLanguage: z.enum(['xh', 'en']).default('xh') }).strict();
 const verifySchema = z.object({ email: z.string().email().max(320), otp: z.string().regex(/^\d{6}$/) }).strict();
@@ -39,6 +41,7 @@ const recordingIdSchema = z.object({ id: z.string().uuid() });
 const translationIdSchema = z.object({ id: z.string().min(1) }).strict();
 const translationSegmentSchema = z.object({ translationId: z.string().min(1), closeText: z.string().min(1), naturalText: z.string().min(1) }).strict();
 const translationTriggerSchema = z.object({ mode: z.enum(['close', 'natural']).default('natural') }).strict();
+const audienceSchema = z.object({ audience: z.enum(['private', 'family', 'public']) }).strict();
 const baseResource: StoryResourceContext = { storytellerUserId: null, rightsHolderUserId: null, recorderUserId: null, actorStoryRoles: [], actorCircleRole: 'none', storyStatus: 'draft', deletionRequesterUserId: null, audience: 'private', hasApprovedVersion: false, translationApproved: false, activeConsentScopes: new Set(), hasValidBreakGlassGrant: false, assistedConsentSessionOpen: false, custodianAssistedConfirmationCurrent: false, firstStoryVersionApproved: false, adminReadOnlyProjection: true, adminDeletionApproved: false };
 
 type RequestWithState = FastifyRequest & { session?: Session | null; correlationId?: string; rawBody?: Buffer };
@@ -56,7 +59,7 @@ function requireSession(request: RequestWithState, reply: FastifyReply): Session
 
 function assertRoutePolicy(session: Session, action: Parameters<typeof assertCan>[1]): void { assertCan(actorFor(session), action, resourceFor(session)); }
 
-export function buildServer(options: { auth?: AuthService; allowedOrigins?: readonly string[]; foundation?: M2FoundationService; media?: MediaFoundation; review?: TranscriptReviewFoundation; translation?: TranslationReviewFoundation } = {}): FastifyInstance {
+export function buildServer(options: { auth?: AuthService; allowedOrigins?: readonly string[]; foundation?: M2FoundationService; media?: MediaFoundation; review?: TranscriptReviewFoundation; translation?: TranslationReviewFoundation; finalApproval?: FinalApprovalReaderSharing } = {}): FastifyInstance {
   const auth = options.auth ?? new LocalAuthService();
   const foundation = options.foundation ?? new M2FoundationService();
   const provider = process.env.MEDIA_STORAGE_PROVIDER === 'cloudinary' ? createCloudinaryMediaStorageFromEnv() : undefined;
@@ -64,6 +67,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   foundation.setEvidenceMediaResolver((assetId) => media.getEvidenceMedia(assetId));
   const review = options.review ?? new TranscriptReviewFoundation();
   const translation = options.translation ?? new TranslationReviewFoundation();
+  const finalApproval = options.finalApproval ?? new FinalApprovalReaderSharing();
   const logger = createStructuredLogger('api');
   const allowedOrigins = new Set(options.allowedOrigins ?? ['http://localhost:3000']);
   const app = Fastify({ logger: false });
@@ -124,6 +128,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
     if (error instanceof MediaDomainError) { const status = error.code === 'validation_failed' ? 400 : ['consent_required', 'invalid_state_transition', 'upload_incomplete', 'hash_mismatch', 'job_cancelled'].includes(error.code) ? 409 : error.code === 'webhook_invalid' ? 401 : error.code === 'not_found' ? 404 : 500; return problem(reply, status, error.code, correlationId); }
     if (error instanceof ReviewDomainError) { const status = error.code === 'not_found' ? 404 : error.code === 'forbidden' ? 403 : ['conflict', 'invalid_state_transition'].includes(error.code) ? 409 : 400; return problem(reply, status, error.code, correlationId); }
     if (error instanceof TranslationDomainError) { const status = error.code === 'not_found' ? 404 : error.code === 'forbidden' ? 403 : ['transcript_not_approved', 'translation_scope_missing', 'alignment_incomplete', 'blocking_issues', 'conflict'].includes(error.code) ? 409 : 400; return problem(reply, status, error.code, correlationId); }
+    if (error instanceof FinalStoryDomainError) { const status = ['not_found', 'audience_denied'].includes(error.code) ? 404 : error.code === 'forbidden' ? 403 : ['consent_missing', 'conflict', 'invalid_state_transition', 'public_sharing_disabled'].includes(error.code) ? 409 : 400; return problem(reply, status, error.code, correlationId); }
     logger.error('request.failed', { correlationId, route: request.url.split('?')[0], status: 500, errorCode: 'internal_error' });
     return problem(reply, 500, 'internal_error', correlationId);
   });
@@ -158,6 +163,11 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   api.patch('/v1/transcript-segments/:id', { schema: { params: reviewSegmentParamsSchema, body: reviewSegmentSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const body = request.body as z.infer<typeof reviewSegmentSchema>; const header = request.headers['if-match']; const expectedVersion = typeof header === 'string' && /^\"?\d+\"?$/.test(header) ? Number(header.replaceAll('\"', '')) : NaN; if (!Number.isInteger(expectedVersion) || expectedVersion < 1) throw new ReviewDomainError('validation_failed', 'if_match_required'); const result = review.editSegment(session.userId, id, expectedVersion, body.action, body); return reply.header('etag', `\"${result.version}\"`).send(result); });
   api.post('/v1/transcripts/:id/approve-for-translation', { schema: { params: reviewTranscriptParamsSchema, body: z.object({}).strict() } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const header = request.headers['if-match']; const expectedVersion = typeof header === 'string' && /^\"?\d+\"?$/.test(header) ? Number(header.replaceAll('\"', '')) : NaN; if (!Number.isInteger(expectedVersion) || expectedVersion < 1) throw new ReviewDomainError('validation_failed', 'if_match_required'); review.assertTranscriptVersion(id, expectedVersion); return reply.send(review.approveForTranslation(session.userId, id)); });
   api.post('/v1/transcripts/:id/translate', { schema: { params: reviewTranscriptParamsSchema, body: translationTriggerSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const { id } = request.params as { id: string }; const source = review.getApprovedTranscript(id); const resource = await m2Resource(session, { storyId: source.storyId, translationApproved: true }); assertCan(actorFor(session), 'translation.generate', resource); const scopes = await foundation.activeConsentScopes(source.storyId); return reply.code(201).send(await translation.translate({ actorUserId: session.userId, transcript: source, translationScopeGranted: scopes.has('translation') || source.translationScopeGranted, glossaryTerms: review.approvedGlossaryTerms(source.storyId) })); });
+  api.get('/v1/stories/:id/final-preview', { schema: { params: z.object({ id: z.string().min(1) }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; assertCan(actorFor(session), 'story.version.read', finalApproval.resourceFor(session.userId, storyId)); return reply.send(finalApproval.preview(session.userId, storyId)); });
+  api.post('/v1/stories/:id/final-approve', { schema: { params: z.object({ id: z.string().min(1) }), body: z.object({}).strict() } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; assertCan(actorFor(session), 'story.approve_final', finalApproval.resourceFor(session.userId, storyId)); return reply.code(201).send(finalApproval.approveFinal(session.userId, storyId)); });
+  api.get('/v1/stories/:id/reader', { schema: { params: z.object({ id: z.string().min(1) }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; assertCan(actorFor(session), 'story.version.read', finalApproval.resourceFor(session.userId, storyId)); return reply.send(finalApproval.read(session.userId, storyId)); });
+  api.post('/v1/stories/:id/audience', { schema: { params: z.object({ id: z.string().min(1) }), body: audienceSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; const audience = audienceSchema.parse(request.body).audience; const current = finalApproval.stories.get(storyId)?.audience; assertCan(actorFor(session), 'story.audience.change', { ...finalApproval.resourceFor(session.userId, storyId), audienceChange: audience === 'private' || current === 'family' ? 'narrow' : 'widen' }); return reply.send(finalApproval.setAudience(session.userId, storyId, audience)); });
+  api.post('/v1/stories/:id/custodian-confirmation', { schema: { params: z.object({ id: z.string().min(1) }), body: z.object({}).strict() } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; assertCan(actorFor(session), 'story.audience.change', { ...finalApproval.resourceFor(session.userId, storyId), audienceChange: 'widen' }); finalApproval.confirmCustodianAssistedShare(storyId, session.userId); return reply.code(204).send(); });
   api.get('/v1/translations/:id', { schema: { params: translationIdSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const item = translation.get((request.params as { id: string }).id); const resource = await m2Resource(session, { storyId: item.storyId, translationApproved: true }); assertCan(actorFor(session), 'translation.read', resource); return reply.send(item); });
   api.post('/v1/translations/:id/verify', { schema: { params: translationIdSchema, body: z.object({}).strict() } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const item = translation.get((request.params as { id: string }).id); assertCan(actorFor(session), 'translation.issue.manage', await m2Resource(session, { storyId: item.storyId, translationApproved: true })); return reply.send(await translation.verify(item.id)); });
   api.patch('/v1/translation-segments/:id', { schema: { params: translationIdSchema, body: translationSegmentSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const body = request.body as z.infer<typeof translationSegmentSchema>; const item = translation.get(body.translationId); assertCan(actorFor(session), 'translation.segment.edit', await m2Resource(session, { storyId: item.storyId, translationApproved: true })); const header = request.headers['if-match']; const expectedVersion = typeof header === 'string' && /^\"?\d+\"?$/.test(header) ? Number(header.replaceAll('\"', '')) : NaN; if (!Number.isInteger(expectedVersion) || expectedVersion < 1) throw new TranslationDomainError('validation_failed', 'if_match_required'); const result = translation.editSegment(session.userId, body.translationId, (request.params as { id: string }).id, expectedVersion, body.closeText, body.naturalText); return reply.header('etag', `\"${result.version}\"`).send(result); });
@@ -177,7 +187,10 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   return app;
 }
 
+export function validateStartupEnvironment(input: Record<string, unknown> = process.env) { return parseEnv(input); }
+
 if (import.meta.url === `file://${process.argv[1]}`) {
+  validateStartupEnvironment();
   const telemetry = await startObservability({ serviceName: 'api' });
   const dbPool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
   const auditKey = process.env.AUDIT_HMAC_KEY ? Buffer.from(process.env.AUDIT_HMAC_KEY, 'base64') : null;

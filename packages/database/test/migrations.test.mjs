@@ -65,7 +65,7 @@ async function database() {
 async function cleanExternalDatabase(pool) {
   await pool.query('RESET ROLE');
   await pool.query('DROP SCHEMA IF EXISTS drizzle CASCADE');
-  await pool.query('DROP TABLE IF EXISTS audit_events, auth_challenges, idempotency_keys, sessions, users, consent_records, consent_scope_grants, consent_scripts, custodian_designations, family_circles, family_memberships, invitations, persons, stories, story_roles, recordings, media_assets, processing_jobs, webhook_receipts, transcripts, transcript_segments, uncertainty_flags, model_runs, job_step_results, ai_usage_daily, transcript_revisions, family_glossary_terms, notifications, translations, translation_segments, verification_reports, verification_issues CASCADE');
+  await pool.query('DROP TABLE IF EXISTS audit_events, auth_challenges, idempotency_keys, sessions, users, consent_records, consent_scope_grants, consent_scripts, custodian_designations, family_circles, family_memberships, invitations, persons, stories, story_roles, recordings, media_assets, processing_jobs, webhook_receipts, transcripts, transcript_segments, uncertainty_flags, model_runs, job_step_results, ai_usage_daily, transcript_revisions, family_glossary_terms, notifications, translations, translation_segments, verification_reports, verification_issues, story_versions CASCADE');
   const roles = await pool.query("SELECT rolname FROM pg_roles WHERE rolname IN ('eoh_app','eoh_migrator') ORDER BY rolname");
   for (const { rolname } of roles.rows) {
     await pool.query(`DROP OWNED BY ${rolname}`);
@@ -129,7 +129,7 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
     try {
       await rollbackClient.query('BEGIN');
       await rollbackClient.query(migrationSql());
-    assert.deepEqual(await publicTables(rollbackClient), ['ai_usage_daily', 'audit_events', 'auth_challenges', 'consent_records', 'consent_scope_grants', 'consent_scripts', 'custodian_designations', 'family_circles', 'family_glossary_terms', 'family_memberships', 'idempotency_keys', 'invitations', 'job_step_results', 'media_assets', 'model_runs', 'notifications', 'persons', 'processing_jobs', 'recordings', 'sessions', 'stories', 'story_roles', 'transcript_revisions', 'transcript_segments', 'transcripts', 'translation_segments', 'translations', 'uncertainty_flags', 'users', 'verification_issues', 'verification_reports', 'webhook_receipts']);
+    assert.deepEqual(await publicTables(rollbackClient), ['ai_usage_daily', 'audit_events', 'auth_challenges', 'consent_records', 'consent_scope_grants', 'consent_scripts', 'custodian_designations', 'family_circles', 'family_glossary_terms', 'family_memberships', 'idempotency_keys', 'invitations', 'job_step_results', 'media_assets', 'model_runs', 'notifications', 'persons', 'processing_jobs', 'recordings', 'sessions', 'stories', 'story_roles', 'story_versions', 'transcript_revisions', 'transcript_segments', 'transcripts', 'translation_segments', 'translations', 'uncertainty_flags', 'users', 'verification_issues', 'verification_reports', 'webhook_receipts']);
     } finally {
       await rollbackClient.query('ROLLBACK');
       rollbackClient.release();
@@ -138,7 +138,7 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
     assert.equal((await pool.query("SELECT count(*)::int AS count FROM pg_roles WHERE rolname IN ('eoh_app','eoh_migrator')")).rows[0].count, 0);
 
     await migrate(drizzle(pool), { migrationsFolder: fileURLToPath(migrationsDirectory) });
-    assert.deepEqual(await publicTables(pool), ['ai_usage_daily', 'audit_events', 'auth_challenges', 'consent_records', 'consent_scope_grants', 'consent_scripts', 'custodian_designations', 'family_circles', 'family_glossary_terms', 'family_memberships', 'idempotency_keys', 'invitations', 'job_step_results', 'media_assets', 'model_runs', 'notifications', 'persons', 'processing_jobs', 'recordings', 'sessions', 'stories', 'story_roles', 'transcript_revisions', 'transcript_segments', 'transcripts', 'translation_segments', 'translations', 'uncertainty_flags', 'users', 'verification_issues', 'verification_reports', 'webhook_receipts']);
+    assert.deepEqual(await publicTables(pool), ['ai_usage_daily', 'audit_events', 'auth_challenges', 'consent_records', 'consent_scope_grants', 'consent_scripts', 'custodian_designations', 'family_circles', 'family_glossary_terms', 'family_memberships', 'idempotency_keys', 'invitations', 'job_step_results', 'media_assets', 'model_runs', 'notifications', 'persons', 'processing_jobs', 'recordings', 'sessions', 'stories', 'story_roles', 'story_versions', 'transcript_revisions', 'transcript_segments', 'transcripts', 'translation_segments', 'translations', 'uncertainty_flags', 'users', 'verification_issues', 'verification_reports', 'webhook_receipts']);
     const constraintClient = await pool.connect();
     try {
       await constraintClient.query('SET ROLE eoh_app');
@@ -201,7 +201,7 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
     try {
       await migrator.query('SET ROLE eoh_migrator');
       await migrate(drizzle(migrator), { migrationsFolder: fileURLToPath(migrationsDirectory) });
-    assert.equal((await migrator.query("SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations")).rows[0].count, 7);
+    assert.equal((await migrator.query("SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations")).rows[0].count, 8);
       await migrator.query('RESET ROLE');
     } finally {
       migrator.release();

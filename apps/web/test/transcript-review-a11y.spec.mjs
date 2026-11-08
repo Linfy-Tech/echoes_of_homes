@@ -8,4 +8,11 @@ test.describe('transcript review accessibility', () => {
     const results = await new AxeBuilder({ page }).include('main').analyze();
     expect(results.violations).toEqual([]);
   });
+
+  test('S-70 through S-91 reader and sharing shell have no axe violations', async ({ page }) => {
+    await page.goto('/story');
+    await expect(page.getByRole('heading', { name: /your approved story|ibali lakho/i })).toBeVisible();
+    const results = await new AxeBuilder({ page }).include('main').analyze();
+    expect(results.violations).toEqual([]);
+  });
 });

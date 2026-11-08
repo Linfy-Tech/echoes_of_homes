@@ -76,4 +76,19 @@
   "translation.resolveBlocking": "Resolve blocking verification issues first",
   "translation.unavailable": "Translation unavailable",
   "translation.sourceSegment": "isiXhosa source segment"
+  ,"story.title": "Your approved story",
+  "story.preview": "Preview",
+  "story.noPreview": "Choose a story to preview.",
+  "story.reader": "Reader",
+  "story.audio": "Story audio",
+  "story.provenance": "How this story was prepared",
+  "story.sharing": "Sharing settings",
+  "story.keepPrivate": "Keep private",
+  "story.shareFamily": "Share with family",
+  "story.sharePublic": "Share publicly",
+  "story.openReader": "Open reader",
+  "story.audienceChanged": "Sharing setting updated",
+  "story.audienceBlocked": "Family sharing needs the right consent and approval",
+  "story.accessDenied": "This story is not available to you",
+  "story.unavailable": "Story unavailable"
 }
