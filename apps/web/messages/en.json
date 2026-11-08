@@ -52,5 +52,21 @@
   "transcription.status.complete": "Complete",
   "transcription.status.failed": "Failed",
   "transcription.status.missingStory": "Enter the story ID first.",
-  "transcription.status.unavailable": "The transcription status is not available yet."
+  "transcription.status.unavailable": "The transcription status is not available yet.",
+  "review.title": "Check the story",
+  "review.story": "Story",
+  "review.previewStory": "Preview story",
+  "review.remaining": "Parts needing attention",
+  "review.segments": "Story segments",
+  "review.segment": "Segment",
+  "review.play": "Play",
+  "review.flagged": "Please check this part",
+  "review.nextFlag": "Next unclear part",
+  "review.confirm": "Confirm",
+  "review.save": "Save correction",
+  "review.completeAction": "Review complete",
+  "review.saved": "Your review was saved.",
+  "review.complete": "Review complete. The storyteller can now approve it.",
+  "review.unavailable": "This review is not available right now.",
+  "review.conflict": "Someone changed this part. Refresh and review your changes before saving."
 }
