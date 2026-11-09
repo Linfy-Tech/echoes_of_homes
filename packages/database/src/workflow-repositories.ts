@@ -3,8 +3,9 @@ import type { Pool, PoolClient } from 'pg';
 import * as schema from './schema.ts';
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> };
+type DrizzleClient = ReturnType<typeof drizzle>;
 
-const tx = async <T>(pool: Pool, work: (client: PoolClient, db: any) => Promise<T>): Promise<T> => {
+const tx = async <T>(pool: Pool, work: (client: PoolClient, db: DrizzleClient) => Promise<T>): Promise<T> => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

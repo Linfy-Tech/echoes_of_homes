@@ -21,8 +21,9 @@ const owner = (file) => /^(?:apps|packages|workers)\/([^/]+)(?:\/|$)/.exec(file)
 const external = {
   validation: ['zod'],
   auth: ['better-auth', 'pg', 'uuid'],
-  database: ['@testcontainers/postgresql', 'drizzle-orm', 'drizzle-kit', 'pg'],
-  api: ['fastify', '@fastify/cookie', '@fastify/csrf-protection', '@fastify/helmet', '@fastify/rate-limit', '@fastify/swagger', '@fastify/type-provider-zod', 'zod', 'pg', 'better-auth'],
+  database: ['@testcontainers/postgresql', 'drizzle-orm', 'drizzle-kit', 'pg', 'graphile-worker'],
+  api: ['fastify', '@fastify/cookie', '@fastify/csrf-protection', '@fastify/helmet', '@fastify/rate-limit', '@fastify/swagger', '@fastify/type-provider-zod', 'zod', 'pg', 'better-auth', 'graphile-worker'],
+  'story-processing': ['graphile-worker', 'pg', 'drizzle-orm'],
   observability: ['@opentelemetry/api', '@opentelemetry/api-logs', '@opentelemetry/exporter-logs-otlp-proto', '@opentelemetry/exporter-metrics-otlp-proto', '@opentelemetry/exporter-trace-otlp-proto', '@opentelemetry/resources', '@opentelemetry/sdk-logs', '@opentelemetry/sdk-metrics', '@opentelemetry/sdk-node'],
   web: ['next', 'react', 'react-dom', '@noble/hashes', '@playwright/test', '@axe-core/playwright'],
 };
