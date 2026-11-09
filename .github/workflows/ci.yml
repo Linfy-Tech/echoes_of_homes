@@ -164,6 +164,7 @@ jobs:
       - name: Hash-diff before and after screenshots
         run: node apps/web/test/compare-screenshots.mjs /tmp/echoes-screenshots
       - name: Upload before and after screenshots
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: echoes-of-home-visual-screenshots-${{ github.sha }}
