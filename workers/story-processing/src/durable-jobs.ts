@@ -30,6 +30,8 @@ export async function runDurableAsrJob(options: {
   provider?: AsrProvider;
   mediaProvider: MediaStorageProvider;
   consentGate: ConsentGate;
+  dailyBudgetMicros?: number;
+  callCostMicros?: number;
   uncertaintyThreshold?: number;
   logger?: Log;
 }): Promise<'succeeded' | 'cancelled' | 'waiting_budget' | 'failed_retryable' | 'failed_permanent'> {
@@ -75,6 +77,11 @@ export async function runDurableAsrJob(options: {
         results.push({ chunk, segments: previous.segments as typeof results[number]['segments'] });
         continue;
       }
+      const admitted = await repo.transaction((client) => repo.reserveUsage(client, provider.provider, options.callCostMicros ?? 1, options.dailyBudgetMicros ?? 1_000_000));
+      if (!admitted) {
+        await repo.transaction((client) => repo.updateJob(client, processingJobId, 'waiting_budget', 'daily_budget_exhausted'));
+        return 'waiting_budget';
+      }
       try {
         const response = await provider.transcribe(chunk, { languageHints: ['xh'] });
         const modelRunId = randomUUID();
@@ -82,7 +89,6 @@ export async function runDurableAsrJob(options: {
         await repo.transaction(async (client) => {
           await repo.createModelRun(client, { id: modelRunId, jobId: processingJobId, role: 'listener_asr', provider: provider.provider, modelId: provider.modelId, inputSha256: inputSha, inputUnits: response.inputUnits ?? chunk.audio.byteLength, outputUnits: response.outputUnits, outcome: 'ok' });
           await repo.writeStep(client, processingJobId, 'asr_chunk', chunk.index, { text: response.text, segments: response.segments }, modelRunId);
-          await repo.upsertUsage(client, provider.provider, 0);
         });
         results.push({ chunk, segments: response.segments });
         options.logger?.('asr.chunk.completed', { processingJobId, chunkIndex: chunk.index });

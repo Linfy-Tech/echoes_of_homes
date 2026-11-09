@@ -325,6 +325,9 @@ importers:
       drizzle-kit:
         specifier: 0.31.11
         version: 0.31.11
+      graphile-worker:
+        specifier: 0.18.0
+        version: 0.18.0(supports-color@7.2.0)(typescript@5.9.3)
 
   packages/media-storage:
     dependencies:
@@ -398,6 +401,9 @@ importers:
       '@types/pg':
         specifier: 8.15.6
         version: 8.15.6
+      drizzle-orm:
+        specifier: 0.45.4
+        version: 0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.15.6)(kysely@0.29.8)(pg@8.16.3)
 
 packages:
 
@@ -3934,7 +3940,7 @@ snapshots:
 
   '@types/interpret@1.1.4':
     dependencies:
-      '@types/node': 22.20.5
+      '@types/node': 24.10.0
 
   '@types/json-schema@7.0.15': {}
 

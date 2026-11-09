@@ -20,10 +20,12 @@ if (!databaseUrl) {
   const recovered = await repo.recoverInFlightJobs();
   logger.info('worker.started', { service: 'story-processing', recoveredJobs: recovered });
   const mediaProvider = process.env.MEDIA_STORAGE_PROVIDER === 'cloudinary' ? createCloudinaryMediaStorageFromEnv() : new FakeMediaStorageProvider();
+  const dailyBudgetMicros = Number(process.env.ASR_DAILY_BUDGET_USD_MICROS ?? 1_000_000);
+  const callCostMicros = Number(process.env.ASR_CALL_COST_USD_MICROS ?? 1);
   const taskList = {
     'asr.transcribe': async (rawPayload: unknown) => {
       const payload = rawPayload as { processingJobId: string };
-      await runDurableAsrJob({ repo, processingJobId: payload.processingJobId, provider: defaultDurableAsrProvider(), mediaProvider, consentGate: (storyId) => repo.consentActive(storyId, ['record_and_store', 'cross_border_processing', 'ai_transcription']), logger: (event, fields) => logger.info(event, fields) });
+      await runDurableAsrJob({ repo, processingJobId: payload.processingJobId, provider: defaultDurableAsrProvider(), mediaProvider, dailyBudgetMicros, callCostMicros, consentGate: (storyId) => repo.consentActive(storyId, ['record_and_store', 'cross_border_processing', 'ai_transcription']), logger: (event, fields) => logger.info(event, fields) });
     },
     'translation.generate': async (rawPayload: unknown) => {
       const payload = rawPayload as { processingJobId: string };
