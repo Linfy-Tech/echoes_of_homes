@@ -143,6 +143,7 @@ jobs:
           test -n "$BEFORE_SHA"
           git worktree add /tmp/echoes-of-home-before "$BEFORE_SHA"
           cd /tmp/echoes-of-home-before
+          cp "$GITHUB_WORKSPACE/apps/web/test/visual-screenshots.spec.mjs" apps/web/test/visual-screenshots.spec.mjs
           pnpm install --frozen-lockfile
           pnpm --filter @echoes-of-home/web build
           pnpm --filter @echoes-of-home/web exec next start --hostname 127.0.0.1 --port 3001 > /tmp/echoes-web-before.log 2>&1 &
