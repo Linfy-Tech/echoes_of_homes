@@ -137,6 +137,9 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BEFORE_SHA="$PR_BASE_SHA"
+          fi
           if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
             BEFORE_SHA="$PR_BASE_SHA"
           fi
@@ -156,6 +159,8 @@ jobs:
           SCREENSHOT_DIR=/tmp/echoes-screenshots SCREENSHOT_VARIANT=before WEB_BASE_URL=http://127.0.0.1:3001 pnpm --filter @echoes-of-home/web exec playwright test test/visual-screenshots.spec.mjs
           kill "$before_pid"
           trap - EXIT
+      - name: Hash-diff before and after screenshots
+        run: node apps/web/test/compare-screenshots.mjs /tmp/echoes-screenshots
       - name: Upload before and after screenshots
         uses: actions/upload-artifact@v4
         with:
