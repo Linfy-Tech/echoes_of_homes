@@ -64,6 +64,13 @@
       "when": 1794002300000,
       "tag": "0008_authoritative_workflow_contracts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794230843922,
+      "tag": "0009_media_upload_recovery",
+      "breakpoints": true
     }
   ]
 }

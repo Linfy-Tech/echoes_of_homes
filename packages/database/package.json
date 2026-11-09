@@ -8,6 +8,7 @@
     "test:audit-chain": "node --test --test-timeout=120000 test/audit-chain.test.mjs",
     "test:migrations": "node --test --test-timeout=120000 test/migrations.test.mjs",
     "test:m2-repository": "node --experimental-strip-types --test --test-timeout=120000 test/m2-repository.test.mjs",
+    "test:workflow-repositories": "node --experimental-strip-types --test --test-timeout=120000 test/workflow-repositories.test.mjs",
     "typecheck": "tsc --build --pretty false"
   },
   "dependencies": {
@@ -18,12 +19,14 @@
     "@echoes-of-home/auth": "workspace:*",
     "@testcontainers/postgresql": "12.2.1",
     "@types/node": "24.10.0",
+    "graphile-worker": "0.18.0",
     "@types/pg": "8.15.6",
     "drizzle-kit": "0.31.11"
   },
   "exports": {
     "./audit-chain": "./src/audit-chain.ts",
     "./schema": "./src/schema.ts",
-    "./m2-repository": "./src/m2-repository.ts"
+    "./m2-repository": "./src/m2-repository.ts",
+    "./workflow-repositories": "./src/workflow-repositories.ts"
   }
 }

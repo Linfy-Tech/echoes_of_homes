@@ -20,6 +20,11 @@ function migrationSql() {
     .join('\n');
 }
 
+function migrationCount() {
+  return readdirSync(migrationsDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.sql')).length;
+}
+
 function assertDisposableUrl(value) {
   let target;
   try {
@@ -201,7 +206,7 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
     try {
       await migrator.query('SET ROLE eoh_migrator');
       await migrate(drizzle(migrator), { migrationsFolder: fileURLToPath(migrationsDirectory) });
-    assert.equal((await migrator.query("SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations")).rows[0].count, 9);
+      assert.equal((await migrator.query("SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations")).rows[0].count, migrationCount());
       await migrator.query('RESET ROLE');
     } finally {
       migrator.release();

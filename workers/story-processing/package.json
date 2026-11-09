@@ -14,5 +14,9 @@
     "@echoes-of-home/media-storage": "workspace:*",
     "graphile-worker": "0.18.0",
     "pg": "8.16.3"
+  },
+  "devDependencies": {
+    "@types/pg": "8.15.6",
+    "drizzle-orm": "0.45.4"
   }
 }
