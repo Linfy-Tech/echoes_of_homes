@@ -82,7 +82,7 @@ test('S-25 records, uploads, waits for verified evidence, and creates assisted c
     await page.route('**/v1/stories/*/consent', async (route) => { consentBody = route.request().postDataJSON(); return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'consent-record-id', evidenceMediaAssetId: consentBody.evidenceMediaAssetId }) }); });
     const storyId = '00000000-0000-0000-0000-000000000014';
     await page.goto(`${process.env.EOH_WEB_URL ?? 'http://localhost:3000'}/consent/${storyId}`);
-    await page.getByText('Consent script: This is a placeholder consent script for testing.', { exact: false }).waitFor();
+    await page.getByText('Consent script: We would like to record and safely keep this family story.', { exact: false }).waitFor();
     await page.getByRole('button', { name: 'Start recording' }).click();
     await page.getByRole('button', { name: 'Stop and upload' }).click();
     await page.getByText('Verbal consent saved with verified evidence.').waitFor({ timeout: 5000 });
