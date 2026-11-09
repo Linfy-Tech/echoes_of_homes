@@ -4,6 +4,7 @@ import path from 'node:path';
 
 const outputDir = process.env.SCREENSHOT_DIR ?? '/tmp/echoes-screenshots';
 const variant = process.env.SCREENSHOT_VARIANT ?? 'after';
+const baseUrl = process.env.WEB_BASE_URL ?? 'http://127.0.0.1:3000';
 const viewports = { desktop: { width: 1440, height: 1100 }, mobile: { width: 390, height: 844 } };
 const locales = ['en', 'xh'];
 
@@ -32,7 +33,7 @@ async function captureLocale(browser, locale) {
   for (const group of groups) {
     for (const route of group.routes) {
       await page.setViewportSize(viewports.desktop);
-      await page.goto(route, { waitUntil: 'networkidle' });
+      await page.goto(new URL(route, baseUrl).toString(), { waitUntil: 'networkidle' });
       if (route === '/') {
         const languageButton = locale === 'xh' ? /isiXhosa/i : /English/i;
         await page.getByRole('button', { name: languageButton }).click();
