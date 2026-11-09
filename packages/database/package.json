@@ -24,6 +24,7 @@
   "exports": {
     "./audit-chain": "./src/audit-chain.ts",
     "./schema": "./src/schema.ts",
-    "./m2-repository": "./src/m2-repository.ts"
+    "./m2-repository": "./src/m2-repository.ts",
+    "./workflow-repositories": "./src/workflow-repositories.ts"
   }
 }

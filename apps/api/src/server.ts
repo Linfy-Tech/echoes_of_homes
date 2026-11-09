@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -20,6 +20,7 @@ import { ReviewDomainError, TranscriptReviewFoundation } from './transcript-revi
 import { TranslationDomainError, TranslationReviewFoundation } from './translation-review-foundation.ts';
 import { parseEnv } from '@echoes-of-home/validation/env';
 import { FinalApprovalReaderSharing, FinalStoryDomainError } from './final-approval-reader-sharing.ts';
+import { DrizzleWorkflowRepository } from '@echoes-of-home/database/workflow-repositories';
 
 const challengeSchema = z.object({ email: z.string().email().max(320), uiLanguage: z.enum(['xh', 'en']).default('xh') }).strict();
 const verifySchema = z.object({ email: z.string().email().max(320), otp: z.string().regex(/^\d{6}$/) }).strict();
@@ -60,7 +61,7 @@ function requireSession(request: RequestWithState, reply: FastifyReply): Session
 
 function assertRoutePolicy(session: Session, action: Parameters<typeof assertCan>[1]): void { assertCan(actorFor(session), action, resourceFor(session)); }
 
-export function buildServer(options: { auth?: AuthService; allowedOrigins?: readonly string[]; foundation?: M2FoundationService; media?: MediaFoundation; review?: TranscriptReviewFoundation; translation?: TranslationReviewFoundation; finalApproval?: FinalApprovalReaderSharing } = {}): FastifyInstance {
+export function buildServer(options: { auth?: AuthService; allowedOrigins?: readonly string[]; foundation?: M2FoundationService; media?: MediaFoundation; review?: TranscriptReviewFoundation; translation?: TranslationReviewFoundation; finalApproval?: FinalApprovalReaderSharing; workflowRepository?: DrizzleWorkflowRepository } = {}): FastifyInstance {
   const auth = options.auth ?? new LocalAuthService();
   const foundation = options.foundation ?? new M2FoundationService();
   const provider = process.env.MEDIA_STORAGE_PROVIDER === 'cloudinary' ? createCloudinaryMediaStorageFromEnv() : undefined;
@@ -69,6 +70,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   const review = options.review ?? new TranscriptReviewFoundation();
   const translation = options.translation ?? new TranslationReviewFoundation();
   const finalApproval = options.finalApproval ?? new FinalApprovalReaderSharing();
+  const workflowRepository = options.workflowRepository;
   const logger = createStructuredLogger('api');
   const allowedOrigins = new Set(options.allowedOrigins ?? ['http://localhost:3000']);
   const app = Fastify({ logger: false });
@@ -170,7 +172,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   api.get('/v1/stories/:id/final-preview', { schema: { params: z.object({ id: z.string().min(1) }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; assertCan(actorFor(session), 'story.version.read', finalApproval.resourceFor(session.userId, storyId)); return reply.send(finalApproval.preview(session.userId, storyId)); });
   api.post('/v1/stories/:id/final-approve', { schema: { params: z.object({ id: z.string().min(1) }), body: z.object({}).strict() } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; assertCan(actorFor(session), 'story.approve_final', finalApproval.resourceFor(session.userId, storyId)); return reply.code(201).send(finalApproval.approveFinal(session.userId, storyId)); });
   api.get('/v1/stories/:id/versions/current', { schema: { params: z.object({ id: z.string().min(1) }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; assertCan(actorFor(session), 'story.version.read', finalApproval.resourceFor(session.userId, storyId)); return reply.send(finalApproval.preview(session.userId, storyId)); });
-  api.post('/v1/stories/:id/versions', { schema: { params: z.object({ id: z.string().min(1) }), body: finalApprovalSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; const body = finalApprovalSchema.parse(request.body); assertCan(actorFor(session), 'story.approve_final', finalApproval.resourceFor(session.userId, storyId)); const version = finalApproval.approveFinal(session.userId, storyId, body); return reply.code(201).send({ storyVersionId: version.id, versionNumber: version.versionNumber, audience: 'private' }); });
+  api.post('/v1/stories/:id/versions', { schema: { params: z.object({ id: z.string().min(1) }), body: finalApprovalSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; const body = finalApprovalSchema.parse(request.body); assertCan(actorFor(session), 'story.approve_final', finalApproval.resourceFor(session.userId, storyId)); const version = finalApproval.approveFinal(session.userId, storyId, body); if (workflowRepository) { const snapshotHash = createHash('sha256').update(JSON.stringify({ transcriptId: body.transcriptId, translationId: body.translationId, transcriptHash: version.transcriptHash, translationHash: version.translationHash, audioAssetId: version.audioAssetId })).digest(); await workflowRepository.transaction((client) => workflowRepository.persistApprovedStoryVersion(client, { id: version.id, storyId, transcriptId: body.transcriptId, translationId: body.translationId, approvedByUserId: session.userId, snapshotHash, acceptedUncertaintyCount: 0 })); } return reply.code(201).send({ storyVersionId: version.id, versionNumber: version.versionNumber, audience: 'private' }); });
   api.get('/v1/stories/:id/reader', { schema: { params: z.object({ id: z.string().min(1) }) } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; assertCan(actorFor(session), 'story.version.read', finalApproval.resourceFor(session.userId, storyId)); return reply.send(finalApproval.read(session.userId, storyId)); });
   api.post('/v1/stories/:id/audience', { schema: { params: z.object({ id: z.string().min(1) }), body: audienceSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; const audience = audienceSchema.parse(request.body).audience; const current = finalApproval.stories.get(storyId)?.audience; assertCan(actorFor(session), 'story.audience.change', { ...finalApproval.resourceFor(session.userId, storyId), audienceChange: audience === 'private' || current === 'family' ? 'narrow' : 'widen' }); return reply.send(finalApproval.setAudience(session.userId, storyId, audience)); });
   api.put('/v1/stories/:id/audience', { schema: { params: z.object({ id: z.string().min(1) }), body: audienceSchema } }, async (request, reply) => { const session = requireSession(request, reply); if (!session) return; const storyId = (request.params as { id: string }).id; const ifMatch = request.headers['if-match']; if (typeof ifMatch !== 'string') throw new FinalStoryDomainError('conflict', 'if_match_required'); const audience = audienceSchema.parse(request.body).audience; const current = finalApproval.stories.get(storyId)?.audience; assertCan(actorFor(session), 'story.audience.change', { ...finalApproval.resourceFor(session.userId, storyId), audienceChange: audience === 'private' || current === 'family' ? 'narrow' : 'widen' }); finalApproval.setAudience(session.userId, storyId, audience); return reply.send({ audience, effectiveImmediately: true }); });
@@ -205,7 +207,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   try { const keyring = process.env.FIELD_ENCRYPTION_KEYS ? JSON.parse(process.env.FIELD_ENCRYPTION_KEYS) as Record<string, string> : null; const currentId = process.env.FIELD_ENCRYPTION_KEY_CURRENT_ID; const encoded = currentId && keyring ? keyring[currentId] : undefined; if (encoded) fieldKey = Buffer.from(encoded, 'base64'); } catch { fieldKey = null; }
   if (process.env.NODE_ENV === 'production' && (!dbPool || !auditKey || auditKey.length < 32 || !fieldKey || fieldKey.length !== 32)) throw new Error('Production M2 persistence requires DATABASE_URL, a 32-byte AUDIT_HMAC_KEY, and the configured 32-byte FIELD_ENCRYPTION_KEYS key');
   const foundation = dbPool && auditKey && fieldKey ? createDrizzleM2FoundationService({ pool: dbPool, auditKey, fieldKey }) : undefined;
-  const app = buildServer({ foundation });
+  const workflowRepository = dbPool ? new DrizzleWorkflowRepository(dbPool) : undefined;
+  const app = buildServer({ foundation, workflowRepository });
   const shutdown = async (): Promise<void> => {
     await app.close();
     await dbPool?.end();
