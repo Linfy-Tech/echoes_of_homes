@@ -136,12 +136,14 @@ jobs:
         env:
           BEFORE_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          STACKED_BASE_BRANCH: slice/ui-ux-polish
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BEFORE_SHA="$PR_BASE_SHA"
           fi
           if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            BEFORE_SHA="$PR_BASE_SHA"
+            git fetch origin "$STACKED_BASE_BRANCH" --depth=50
+            BEFORE_SHA="$(git merge-base HEAD "origin/$STACKED_BASE_BRANCH")"
           fi
           test -n "$BEFORE_SHA"
           git worktree add /tmp/echoes-of-home-before "$BEFORE_SHA"
