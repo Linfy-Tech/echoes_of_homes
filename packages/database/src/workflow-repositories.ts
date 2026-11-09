@@ -3,7 +3,9 @@ import type { Pool, PoolClient } from 'pg';
 import * as schema from './schema.ts';
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }> };
-type DrizzleClient = ReturnType<typeof drizzle>;
+// Drizzle's node-postgres client type differs between Pool and PoolClient;
+// preserve the database API while replacing only its executor type.
+type DrizzleClient = Omit<ReturnType<typeof drizzle>, '$client'> & { $client: PoolClient };
 
 const tx = async <T>(pool: Pool, work: (client: PoolClient, db: DrizzleClient) => Promise<T>): Promise<T> => {
   const client = await pool.connect();
