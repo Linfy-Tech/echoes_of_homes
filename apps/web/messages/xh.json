@@ -13,6 +13,12 @@
   "nav.profile": "Iprofayile",
   "nav.sessions": "Iiseshoni",
   "nav.intro": "Indlela esebenza ngayo",
+  "nav.families": "Iintsapho",
+  "nav.record": "Rekhoda",
+  "nav.transcription": "Ukubhalwa",
+  "nav.review": "Uphononongo",
+  "nav.translation": "Inguqulelo",
+  "nav.story": "Umfundi webali",
   "home.welcome": "Wamkelekile ekhaya",
   "home.description": "Amabali osapho lwakho aza kuhlala apha. Le yindawo yokubonisa de i-API idityaniswe.",
   "home.signInPrompt": "Ngena ukuze uqhubeke",
@@ -90,5 +96,12 @@
   "story.audienceChanged": "Isicwangciso sokwabelana sihlaziyiwe",
   "story.audienceBlocked": "Ukwabelana nosapho kufuna imvume efanelekileyo kunye nokuvunywa",
   "story.accessDenied": "Eli bali alifumaneki kuwe",
-  "story.unavailable": "Ibali alifumaneki"
+  "story.unavailable": "Ibali alifumaneki",
+  "families.title": "Iintsapho nababalisi",
+  "families.description": "Yenza isangqa sosapho, uze wongeze umbalisi nebali.",
+  "families.name": "Igama losapho",
+  "families.create": "Yenza usapho",
+  "families.loading": "Kulayishwa iintsapho…",
+  "families.empty": "Akukho sangqa sosapho okwangoku.",
+  "families.error": "Asikwazanga ukulayisha okanye ukugcina isangqa sosapho. Jonga unxibelelwano nokungena kwakho."
 }

@@ -201,7 +201,7 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
     try {
       await migrator.query('SET ROLE eoh_migrator');
       await migrate(drizzle(migrator), { migrationsFolder: fileURLToPath(migrationsDirectory) });
-    assert.equal((await migrator.query("SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations")).rows[0].count, 8);
+    assert.equal((await migrator.query("SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations")).rows[0].count, 9);
       await migrator.query('RESET ROLE');
     } finally {
       migrator.release();
@@ -215,6 +215,13 @@ test('M1 drizzle migration applies, rolls back transactionally, and enforces rol
       id: 'uuid', user_id: 'uuid', token_hash: 'bytea', created_at: 'timestamptz', last_seen_at: 'timestamptz',
       expires_at: 'timestamptz', revoked_at: 'timestamptz', user_agent_summary: 'text',
     });
+    assert.deepEqual(await columnTypes(pool, 'story_versions'), {
+      id: 'uuid', story_id: 'uuid', version_number: 'int4', status: 'text', approved_by_user_id: 'uuid',
+      approved_at: 'timestamptz', created_at: 'timestamptz', transcript_id: 'uuid', translation_id: 'uuid',
+      snapshot_hash: 'bytea', accepted_uncertainty_count: 'int4',
+    });
+    assert.ok((await pool.query("SELECT 1 FROM pg_constraint WHERE conname='story_versions_approved_sources_guard'")).rowCount === 0, 'approval source guard is a trigger, not a constraint');
+    assert.equal((await pool.query("SELECT count(*)::int AS count FROM pg_indexes WHERE indexname='story_versions_one_current_approved'")).rows[0].count, 1);
     assert.deepEqual(await columnTypes(pool, 'auth_challenges'), {
       id: 'uuid', email_lookup_hash: 'bytea', code_hash: 'bytea', link_token_hash: 'bytea', expires_at: 'timestamptz',
       consumed_at: 'timestamptz', attempts: 'int4', created_ip_hash: 'bytea', created_at: 'timestamptz',
