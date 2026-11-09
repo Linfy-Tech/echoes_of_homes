@@ -19,6 +19,11 @@
   "nav.review": "Review",
   "nav.translation": "Translation",
   "nav.story": "Story reader",
+  "nav.workflow": "Your story",
+  "nav.account": "Account",
+  "nav.menu": "Menu",
+  "nav.close": "Close",
+  "nav.skip": "Skip to content",
   "home.welcome": "Welcome home",
   "home.description": "Your family stories will live here. This shell uses preview data until the API is connected.",
   "home.signInPrompt": "Sign in to continue",
@@ -93,7 +98,13 @@
   "translation.resolveBlocking": "Resolve blocking verification issues first",
   "translation.unavailable": "Translation unavailable",
   "translation.sourceSegment": "isiXhosa source segment"
-  ,"story.title": "Your approved story",
+  ,"translation.lead": "Read the original beside two English options, then approve only when the checks are clear.",
+  "translation.segmentsLabel": "Translation segments",
+  "translation.sourceLabel": "isiXhosa",
+  "translation.closeLabel": "Close",
+  "translation.naturalLabel": "Natural",
+  "translation.emptyHelp": "Open a translation from an approved transcript to begin review.",
+  "story.title": "Your approved story",
   "story.preview": "Preview",
   "story.noPreview": "Choose a story to preview.",
   "story.reader": "Reader",
@@ -115,4 +126,9 @@
   "families.loading": "Loading families…",
   "families.empty": "No family circles yet.",
   "families.error": "We could not load or save your family circle. Check your connection and sign-in."
+  ,"families.eyebrow": "Begin together",
+  "families.createHelp": "Start a private circle for the people who will care for this story.",
+  "families.listTitle": "Your circles",
+  "families.listHelp": "Stories stay private until you choose to share.",
+  "families.emptyHelp": "Create your first circle to invite storytellers and trusted reviewers."
 }

@@ -19,6 +19,11 @@
   "nav.review": "Uphononongo",
   "nav.translation": "Inguqulelo",
   "nav.story": "Umfundi webali",
+  "nav.workflow": "Ibali lakho",
+  "nav.account": "Iakhawunti",
+  "nav.menu": "Imenyu",
+  "nav.close": "Vala",
+  "nav.skip": "Tsiba uye kumxholo",
   "home.welcome": "Wamkelekile ekhaya",
   "home.description": "Amabali osapho lwakho aza kuhlala apha. Le yindawo yokubonisa de i-API idityaniswe.",
   "home.signInPrompt": "Ngena ukuze uqhubeke",
@@ -93,7 +98,13 @@
   "translation.resolveBlocking": "Sombulula imiba evalayo yokuqinisekisa kuqala",
   "translation.unavailable": "Inguqulelo ayifumaneki",
   "translation.sourceSegment": "Icandelo lomthombo lesiXhosa"
-  ,"story.title": "Ibali lakho elivunyiweyo",
+  ,"translation.lead": "Funda imvelaphi ecaleni kweenguqulelo ezimbini zesiNgesi, uze uvume kuphela xa iitshekhi zicacile.",
+  "translation.segmentsLabel": "Amacandelo enguqulelo",
+  "translation.sourceLabel": "isiXhosa",
+  "translation.closeLabel": "Ekufuphi nemvelaphi",
+  "translation.naturalLabel": "Ngokwendalo",
+  "translation.emptyHelp": "Vula inguqulelo evela kwitranskripthi evunyiweyo ukuze uqale uphononongo.",
+  "story.title": "Ibali lakho elivunyiweyo",
   "story.preview": "Jonga kuqala",
   "story.noPreview": "Khetha ibali ukuze ujonge kuqala.",
   "story.reader": "Umfundi",
@@ -115,4 +126,9 @@
   "families.loading": "Kulayishwa iintsapho…",
   "families.empty": "Akukho sangqa sosapho okwangoku.",
   "families.error": "Asikwazanga ukulayisha okanye ukugcina isangqa sosapho. Jonga unxibelelwano nokungena kwakho."
+  ,"families.eyebrow": "Qala kunye",
+  "families.createHelp": "Qala isangqa sabucala sabantu abaza kulikhathalela eli bali.",
+  "families.listTitle": "Izangqa zakho",
+  "families.listHelp": "Amabali ahlala eyimfihlo de ukhethe ukwabelana.",
+  "families.emptyHelp": "Yenza isangqa sakho sokuqala ukuze umeme ababalisi nabaphononongi obathembayo."
 }
