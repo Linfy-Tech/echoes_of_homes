@@ -134,11 +134,14 @@ jobs:
           trap - EXIT
       - name: Capture before screenshots from comparison revision
         env:
-          BEFORE_SHA: ${{ github.event.before }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          STACKED_BASE_BRANCH: slice/ui-ux-polish
         run: |
-          if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
             BEFORE_SHA="$PR_BASE_SHA"
+          else
+            git fetch origin "$STACKED_BASE_BRANCH" --depth=50
+            BEFORE_SHA="$(git merge-base HEAD "origin/$STACKED_BASE_BRANCH")"
           fi
           test -n "$BEFORE_SHA"
           git worktree add /tmp/echoes-of-home-before "$BEFORE_SHA"
@@ -156,7 +159,10 @@ jobs:
           SCREENSHOT_DIR=/tmp/echoes-screenshots SCREENSHOT_VARIANT=before WEB_BASE_URL=http://127.0.0.1:3001 pnpm --filter @echoes-of-home/web exec playwright test test/visual-screenshots.spec.mjs
           kill "$before_pid"
           trap - EXIT
+      - name: Hash-diff before and after screenshots
+        run: node apps/web/test/compare-screenshots.mjs /tmp/echoes-screenshots
       - name: Upload before and after screenshots
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: echoes-of-home-visual-screenshots-${{ github.sha }}
