@@ -18,6 +18,7 @@ Template: `/.env.example` (placeholders only). All variables are validated at pr
 | `DATABASE_POOL_MAX` | A K | | no | Default 10 |
 | `DATABASE_SSL_MODE` | A K C | | yes | `require` unless private-network TLS posture documented (OQ-008) |
 | `SESSION_TOKEN_PEPPER` | A | 🔐 | yes | ≥ 32 random bytes |
+| `SESSION_LOOKUP_KEY` | A | 🔐 | yes when `DATABASE_URL` is set | Independent ≥ 32-byte HMAC key for email/OTP lookup |
 | `SESSION_ABSOLUTE_TTL_HOURS` | A | | no | Default 720 |
 | `SESSION_IDLE_TIMEOUT_MINUTES` | A | | no | Default 10080 |
 | `AUDIT_HMAC_KEY` | A K | 🔐 | yes | Audit hash-chain key |

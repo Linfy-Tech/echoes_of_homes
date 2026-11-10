@@ -14,6 +14,40 @@ export type AuthService = {
   revokeAll(userId: string): Promise<void>;
 };
 
+type AuthKeyMaterial = {
+  pepper: Buffer;
+  lookup: Buffer;
+  encryption: Readonly<Record<string, Buffer>>;
+  currentKeyId: string;
+};
+
+function requiredBase64Key(env: NodeJS.ProcessEnv, name: string): Buffer {
+  const value = env[name];
+  if (!value) throw new Error(`${name} is required for durable authentication`);
+  const key = Buffer.from(value, 'base64');
+  if (key.length !== 32) throw new Error(`${name} must decode to 32 bytes`);
+  return key;
+}
+
+export function authKeysFromEnv(env: NodeJS.ProcessEnv = process.env): AuthKeyMaterial {
+  const rawKeyring = env.FIELD_ENCRYPTION_KEYS;
+  const currentKeyId = env.FIELD_ENCRYPTION_KEY_CURRENT_ID;
+  if (!rawKeyring || !currentKeyId) throw new Error('FIELD_ENCRYPTION_KEYS and FIELD_ENCRYPTION_KEY_CURRENT_ID are required for durable authentication');
+  let parsed: Record<string, string>;
+  try { parsed = JSON.parse(rawKeyring) as Record<string, string>; } catch { throw new Error('FIELD_ENCRYPTION_KEYS must be valid JSON'); }
+  const encryption = Object.fromEntries(Object.entries(parsed).map(([id, value]) => {
+    const key = Buffer.from(value, 'base64');
+    if (key.length !== 32) throw new Error(`FIELD_ENCRYPTION_KEYS.${id} must decode to 32 bytes`);
+    return [id, key];
+  }));
+  return {
+    pepper: requiredBase64Key(env, 'SESSION_TOKEN_PEPPER'),
+    lookup: requiredBase64Key(env, 'SESSION_LOOKUP_KEY'),
+    encryption,
+    currentKeyId,
+  };
+}
+
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const normaliseEmail = (email: string) => email.trim().toLowerCase();
 
@@ -64,6 +98,21 @@ export class LocalAuthService implements AuthService {
   async revokeAll(userId: string): Promise<void> {
     for (const [token, session] of this.sessions) if (session.userId === userId) this.sessions.delete(token);
   }
+}
+
+/** Selects durable authentication whenever the API has a database configured. */
+export async function createAuthServiceFromEnv(options: { pool?: Pool; auditKey?: Buffer; env?: NodeJS.ProcessEnv; onOtp?: (mail: { email: string; otp: string }) => void } = {}): Promise<AuthService> {
+  const env = options.env ?? process.env;
+  if (!env.DATABASE_URL) return new LocalAuthService();
+  if (!options.pool) throw new Error('DATABASE_URL requires a Postgres pool for durable authentication');
+  const auditKey = options.auditKey ?? requiredBase64Key(env, 'AUDIT_HMAC_KEY');
+  const keys = authKeysFromEnv(env);
+  return createBetterAuthService({
+    pool: options.pool,
+    authKeys: keys,
+    audit: { key: auditKey, context: () => ({ actorType: 'system', actorUserId: null, correlationId: 'api:auth' }) },
+    onOtp: options.onOtp,
+  });
 }
 
 /** Production Better Auth wiring. HTTP routes depend only on AuthService. */

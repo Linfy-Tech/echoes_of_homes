@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --build --pretty false",
-    "test:routes": "node --experimental-strip-types --test test/routes.test.mjs",
+    "test:routes": "node --experimental-strip-types --test test/routes.test.mjs test/auth-bootstrap.test.mjs test/cors.test.mjs",
     "test:routes:postgres": "node --experimental-strip-types --test --test-timeout=30000 test/postgres-routes.test.mjs",
     "test:openapi": "node --experimental-strip-types --test test/openapi.test.mjs",
     "openapi:generate": "node --experimental-strip-types scripts/generate-openapi.mjs",
@@ -20,6 +20,7 @@
     "@echoes-of-home/observability": "workspace:*",
     "@echoes-of-home/validation": "workspace:*",
     "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^10.1.0",
     "@fastify/csrf-protection": "^7.1.0",
     "@fastify/helmet": "^13.0.2",
     "@fastify/rate-limit": "^10.3.0",
