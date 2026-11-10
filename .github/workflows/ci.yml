@@ -3,6 +3,16 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
+  docker-builds:
+    name: Build API and story-processing images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build --file apps/api/Dockerfile --tag echoes-of-home-api:ci .
+      - name: Build story-processing worker image
+        run: docker build --file workers/story-processing/Dockerfile --tag echoes-of-home-story-processing:ci .
+
   checks:
     runs-on: ubuntu-latest
     env:
