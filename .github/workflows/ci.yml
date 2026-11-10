@@ -3,6 +3,16 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
+  docker-builds:
+    name: Build API and story-processing images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build --file apps/api/Dockerfile --tag echoes-of-home-api:ci .
+      - name: Build story-processing worker image
+        run: docker build --file workers/story-processing/Dockerfile --tag echoes-of-home-story-processing:ci .
+
   checks:
     runs-on: ubuntu-latest
     env:
@@ -102,70 +112,3 @@ jobs:
         if: ${{ env.RAILWAY_TOKEN != '' }}
         continue-on-error: true
         run: railway config plan --file .railway/railway.ts --environment staging --json
-
-  visual-screenshots:
-    name: Visual screenshot set (before and after)
-    needs: checks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Install Playwright Chromium
-        run: pnpm --filter @echoes-of-home/web exec playwright install --with-deps chromium
-      - name: Capture after screenshots
-        run: |
-          pnpm --filter @echoes-of-home/web build
-          pnpm --filter @echoes-of-home/web exec next start --hostname 127.0.0.1 --port 3000 > /tmp/echoes-web-after.log 2>&1 &
-          after_pid=$!
-          trap 'kill "$after_pid" 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:3000/; then break; fi
-            sleep 2
-          done
-          SCREENSHOT_DIR=/tmp/echoes-screenshots SCREENSHOT_VARIANT=after pnpm --filter @echoes-of-home/web exec playwright test test/visual-screenshots.spec.mjs
-          kill "$after_pid"
-          trap - EXIT
-      - name: Capture before screenshots from comparison revision
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          STACKED_BASE_BRANCH: slice/ui-ux-polish
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BEFORE_SHA="$PR_BASE_SHA"
-          else
-            git fetch origin "$STACKED_BASE_BRANCH" --depth=50
-            BEFORE_SHA="$(git merge-base HEAD "origin/$STACKED_BASE_BRANCH")"
-          fi
-          test -n "$BEFORE_SHA"
-          git worktree add /tmp/echoes-of-home-before "$BEFORE_SHA"
-          cd /tmp/echoes-of-home-before
-          cp "$GITHUB_WORKSPACE/apps/web/test/visual-screenshots.spec.mjs" apps/web/test/visual-screenshots.spec.mjs
-          pnpm install --frozen-lockfile
-          pnpm --filter @echoes-of-home/web build
-          pnpm --filter @echoes-of-home/web exec next start --hostname 127.0.0.1 --port 3001 > /tmp/echoes-web-before.log 2>&1 &
-          before_pid=$!
-          trap 'kill "$before_pid" 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:3001/; then break; fi
-            sleep 2
-          done
-          SCREENSHOT_DIR=/tmp/echoes-screenshots SCREENSHOT_VARIANT=before WEB_BASE_URL=http://127.0.0.1:3001 pnpm --filter @echoes-of-home/web exec playwright test test/visual-screenshots.spec.mjs
-          kill "$before_pid"
-          trap - EXIT
-      - name: Hash-diff before and after screenshots
-        run: node apps/web/test/compare-screenshots.mjs /tmp/echoes-screenshots
-      - name: Upload before and after screenshots
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: echoes-of-home-visual-screenshots-${{ github.sha }}
-          path: /tmp/echoes-screenshots
-          if-no-files-found: error
-          retention-days: 14

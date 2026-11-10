@@ -7,7 +7,7 @@ import { randomBytes, createHmac } from 'node:crypto';
 import { before, after, test } from 'node:test';
 import { Pool } from 'pg';
 import { buildServer } from '../src/server.ts';
-import { createBetterAuthService } from '../src/auth-service.ts';
+import { createAuthServiceFromEnv } from '../src/auth-service.ts';
 import { credentials } from '@echoes-of-home/auth/credentials';
 
 const location = mkdtempSync(join(tmpdir(), 'echoes-api-auth-'));
@@ -39,7 +39,15 @@ before(async () => {
       correlation_id text NOT NULL, prev_hash bytea NOT NULL, hash bytea NOT NULL
     ); ALTER SEQUENCE audit_events_id_seq OWNED BY audit_events.id`);
   const audit = { key: randomBytes(32), context: () => ({ actorType: 'system', correlationId: 'api-integration-test' }) };
-  const auth = await createBetterAuthService({ pool, authKeys: keys, audit, onOtp: (mail) => { delivered = mail; } });
+  const authEnv = {
+    DATABASE_URL: connectionString ?? 'postgresql://localhost/echoes_auth_test',
+    AUDIT_HMAC_KEY: audit.key.toString('base64'),
+    SESSION_TOKEN_PEPPER: keys.pepper.toString('base64'),
+    SESSION_LOOKUP_KEY: keys.lookup.toString('base64'),
+    FIELD_ENCRYPTION_KEYS: JSON.stringify({ k1: keys.encryption.k1.toString('base64') }),
+    FIELD_ENCRYPTION_KEY_CURRENT_ID: keys.currentKeyId,
+  };
+  const auth = await createAuthServiceFromEnv({ pool, env: authEnv, onOtp: (mail) => { delivered = mail; } });
   app = buildServer({ auth });
   await app.ready();
 });

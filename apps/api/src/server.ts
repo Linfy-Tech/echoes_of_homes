@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
+import cors from '@fastify/cors';
 import csrfProtection from '@fastify/csrf-protection';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -11,7 +12,7 @@ import { hasZodFastifySchemaValidationErrors, jsonSchemaTransform, serializerCom
 import { z } from 'zod';
 import { assertCan, AuthorizationError, type Actor, type StoryResourceContext } from '@echoes-of-home/auth/policy';
 import { createStructuredLogger, startObservability } from '@echoes-of-home/observability';
-import { LocalAuthService, type AuthService, type Session } from './auth-service.ts';
+import { createAuthServiceFromEnv, LocalAuthService, type AuthService, type Session } from './auth-service.ts';
 import { createDrizzleM2FoundationService, M2FoundationService } from './m2-foundation.ts';
 import { Pool } from 'pg';
 import { createDurableMediaFoundation, createMediaFoundation, MediaDomainError, type MediaFoundation } from './media-foundation.ts';
@@ -50,6 +51,10 @@ const baseResource: StoryResourceContext = { storytellerUserId: null, rightsHold
 type RequestWithState = FastifyRequest & { session?: Session | null; correlationId?: string; rawBody?: Buffer };
 const actorFor = (session: Session): Actor => ({ userId: session.userId, accountRole: 'member', status: 'active', secondFactorVerified: false });
 const resourceFor = (session: Session): StoryResourceContext => ({ ...baseResource, storytellerUserId: session.userId, rightsHolderUserId: session.userId });
+const originsFromEnv = (env: NodeJS.ProcessEnv = process.env): string[] => {
+  const configured = env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean);
+  return configured?.length ? configured : ['http://localhost:3000'];
+};
 
 function problem(reply: FastifyReply, status: number, code: string, correlationId: string, errors: unknown[] = []): FastifyReply {
   return reply.code(status).type('application/problem+json').send({ type: `https://errors.echoes-of-home.example/${code.replaceAll('_', '-')}`, title: code, status, code, detail: status >= 500 ? 'An internal error occurred.' : code, correlationId, errors });
@@ -75,7 +80,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   const finalApproval = options.finalApproval ?? new FinalApprovalReaderSharing();
   const workflowRepository = options.workflowRepository;
   const logger = createStructuredLogger('api');
-  const allowedOrigins = new Set(options.allowedOrigins ?? ['http://localhost:3000']);
+  const allowedOrigins = new Set(options.allowedOrigins ?? originsFromEnv());
   const app = Fastify({ logger: false });
   app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
   app.setValidatorCompiler(validatorCompiler);
@@ -92,6 +97,7 @@ export function buildServer(options: { auth?: AuthService; allowedOrigins?: read
   app.decorateRequest('correlationId', '');
   app.decorateRequest('rawBody', null);
   app.register(cookie);
+  app.register(cors, { origin: [...allowedOrigins], credentials: true });
   app.register(csrfProtection, { cookieOpts: { signed: false, sameSite: 'lax', httpOnly: true } });
   app.register(helmet, { global: true });
   app.register(rateLimit, { max: 100, timeWindow: '1 minute', errorResponseBuilder: (_request, context) => ({ code: 'rate_limited', retryAfter: context.after }) });
@@ -212,7 +218,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const foundation = dbPool && auditKey && fieldKey ? createDrizzleM2FoundationService({ pool: dbPool, auditKey, fieldKey }) : undefined;
   const workflowRepository = dbPool ? new DrizzleWorkflowRepository(dbPool) : undefined;
   if (process.env.DATABASE_URL) await runGraphileMigrations({ connectionString: process.env.DATABASE_URL });
-  const app = buildServer({ foundation, workflowRepository });
+  const auth = await createAuthServiceFromEnv({ pool: dbPool ?? undefined });
+  const app = buildServer({ auth, foundation, workflowRepository });
   const shutdown = async (): Promise<void> => {
     await app.close();
     await dbPool?.end();
