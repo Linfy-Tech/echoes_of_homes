@@ -55,6 +55,27 @@ test('state-changing session routes require origin and requested-with CSRF heade
   assert.equal(response.json().code, 'forbidden');
 });
 
+test('configured web origins are parsed and accepted by the state-changing CSRF gate', async (t) => {
+  const origin = 'https://echoes-of-home-web.vercel.app';
+  const previousOrigins = process.env.ALLOWED_ORIGINS;
+  process.env.ALLOWED_ORIGINS = ` ${origin}, http://localhost:3000 `;
+  const auth = new LocalAuthService();
+  try {
+    const app = buildServer({ auth });
+    await app.ready();
+    t.after(async () => { await app.close(); if (previousOrigins === undefined) delete process.env.ALLOWED_ORIGINS; else process.env.ALLOWED_ORIGINS = previousOrigins; });
+
+    await app.inject({ method: 'POST', url: '/v1/auth/challenges', payload: { email: 'origin@example.invalid' } });
+    const verified = await app.inject({ method: 'POST', url: '/v1/auth/challenges/verify', payload: { email: 'origin@example.invalid', otp: auth.delivered.get('origin@example.invalid') } });
+    const cookie = verified.headers['set-cookie'];
+    const response = await app.inject({ method: 'POST', url: '/v1/me/sessions/revoke-all', headers: { cookie, origin, 'x-requested-with': 'eoh-web' } });
+    assert.equal(response.statusCode, 204);
+  } catch (error) {
+    if (previousOrigins === undefined) delete process.env.ALLOWED_ORIGINS; else process.env.ALLOWED_ORIGINS = previousOrigins;
+    throw error;
+  }
+});
+
 test('challenge input uses the contract validation error shape', async (t) => {
   const { app } = await make();
   t.after(() => app.close());

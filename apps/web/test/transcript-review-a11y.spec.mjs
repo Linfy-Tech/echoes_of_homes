@@ -2,6 +2,10 @@ import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 test.describe('transcript review accessibility', () => {
+  test.beforeEach(async ({ context }) => {
+    await context.addCookies([{ name: 'eoh_session', value: 'test-session', url: process.env.WEB_BASE_URL ?? 'http://127.0.0.1:3000', httpOnly: true, sameSite: 'Lax' }]);
+  });
+
   test('S-50 through S-53 have no axe violations', async ({ page }) => {
     await page.goto('/review');
     await expect(page.getByRole('heading', { name: /check the story|jonga ibali/i })).toBeVisible();

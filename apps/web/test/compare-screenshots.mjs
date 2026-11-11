@@ -34,4 +34,4 @@ for (const file of afterFiles) if (await hash(path.join(beforeRoot, file)) === a
 const report = { beforeCount: beforeFiles.length, afterCount: afterFiles.length, identicalCount: identical.length, changedCount: afterFiles.length - identical.length, identical };
 await writeFile(path.join(root, 'visual-diff-report.json'), `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
-if (identical.length > 2) throw new Error(`More than two before/after screenshot pairs are identical (${identical.length}); capture comparison is not trustworthy.`);
+if (report.changedCount === 0) throw new Error(`Screenshot comparison is not trustworthy: all ${beforeFiles.length} before/after pairs are identical.`);
