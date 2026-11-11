@@ -5,7 +5,7 @@ permissions:
 jobs:
   docker-builds:
     name: Build API and story-processing images
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Build API image
@@ -14,7 +14,7 @@ jobs:
         run: docker build --file workers/story-processing/Dockerfile --tag echoes-of-home-story-processing:ci .
 
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
     services:
@@ -42,7 +42,7 @@ jobs:
         run: node --version
       - run: pnpm install --frozen-lockfile
       - name: Install Playwright Chromium
-        run: pnpm --filter @echoes-of-home/web exec playwright install --with-deps chromium
+        run: pnpm --filter @echoes-of-home/web exec playwright install chromium
       - name: Dependency vulnerability audit
         run: pnpm audit --audit-level high
       - run: pnpm typecheck
@@ -120,7 +120,7 @@ jobs:
         run: railway config plan --file .railway/railway.ts --environment staging --json
   web-changes:
     name: Detect web changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       changed: ${{ steps.changed.outputs.changed }}
     steps:
@@ -144,7 +144,7 @@ jobs:
     name: Visual screenshot set (before and after)
     needs: [checks, web-changes]
     if: needs.web-changes.outputs.changed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -156,7 +156,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Install Playwright Chromium
-        run: pnpm --filter @echoes-of-home/web exec playwright install --with-deps chromium
+        run: pnpm --filter @echoes-of-home/web exec playwright install chromium
       - name: Start local API session fixture for screenshots
         run: nohup node apps/web/test/auth-fixture-api.mjs > /tmp/echoes-auth-fixture.log 2>&1 &
       - name: Capture after screenshots
