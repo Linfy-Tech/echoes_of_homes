@@ -4,9 +4,10 @@ import assert from 'node:assert/strict';
 test('recording upload resumes after an interrupted throttled browser request', { skip: process.env.RUN_PLAYWRIGHT !== '1' }, async () => {
   let playwright;
   try { playwright = await import('@playwright/test'); } catch { throw new Error('RUN_PLAYWRIGHT=1 requires @playwright/test and its browser binaries'); }
-  const browser = await playwright.chromium.launch();
+  const browser = await playwright.chromium.launch({ executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH });
   try {
     const context = await browser.newContext({ permissions: ['microphone'] });
+    await context.addCookies([{ name: 'eoh_session', value: 'test-session', url: process.env.EOH_WEB_URL ?? 'http://localhost:3000', httpOnly: true, sameSite: 'Lax' }]);
     const page = await context.newPage();
     await page.addInitScript(() => {
       class FakeMediaRecorder {
@@ -47,9 +48,10 @@ test('recording upload resumes after an interrupted throttled browser request', 
 test('S-25 records, uploads, waits for verified evidence, and creates assisted consent', { skip: process.env.RUN_PLAYWRIGHT !== '1' }, async () => {
   let playwright;
   try { playwright = await import('@playwright/test'); } catch { throw new Error('RUN_PLAYWRIGHT=1 requires @playwright/test and its browser binaries'); }
-  const browser = await playwright.chromium.launch();
+  const browser = await playwright.chromium.launch({ executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH });
   try {
     const context = await browser.newContext({ permissions: ['microphone'] });
+    await context.addCookies([{ name: 'eoh_session', value: 'test-session', url: process.env.EOH_WEB_URL ?? 'http://localhost:3000', httpOnly: true, sameSite: 'Lax' }]);
     const page = await context.newPage();
     await page.addInitScript(() => {
       class FakeMediaRecorder {

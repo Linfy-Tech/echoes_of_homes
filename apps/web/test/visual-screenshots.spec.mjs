@@ -2,6 +2,8 @@ import { test } from '@playwright/test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+test.setTimeout(120_000);
+
 const outputDir = process.env.SCREENSHOT_DIR ?? '/tmp/echoes-screenshots';
 const variant = process.env.SCREENSHOT_VARIANT ?? 'after';
 const baseUrl = process.env.WEB_BASE_URL ?? 'http://127.0.0.1:3000';
@@ -25,13 +27,19 @@ async function mockDemoEndpoints(page) {
 }
 
 async function captureLocale(browser, locale) {
-  const context = await browser.newContext({ viewport: viewports.desktop });
-  await context.addInitScript((selectedLocale) => window.localStorage.setItem('eoh-language', selectedLocale), locale);
-  const page = await context.newPage();
-  await mockDemoEndpoints(page);
+  const publicContext = await browser.newContext({ viewport: viewports.desktop });
+  await publicContext.addInitScript((selectedLocale) => window.localStorage.setItem('eoh-language', selectedLocale), locale);
+  const publicPage = await publicContext.newPage();
+  await mockDemoEndpoints(publicPage);
+  const authenticatedContext = await browser.newContext({ viewport: viewports.desktop });
+  await authenticatedContext.addCookies([{ name: 'eoh_session', value: 'test-session', url: baseUrl, httpOnly: true, sameSite: 'Lax' }]);
+  await authenticatedContext.addInitScript((selectedLocale) => window.localStorage.setItem('eoh-language', selectedLocale), locale);
+  const authenticatedPage = await authenticatedContext.newPage();
+  await mockDemoEndpoints(authenticatedPage);
 
   for (const group of groups) {
     for (const route of group.routes) {
+      const page = group.name === '02-first-impression' ? publicPage : authenticatedPage;
       await page.setViewportSize(viewports.desktop);
       await page.goto(new URL(route, baseUrl).toString(), { waitUntil: 'networkidle' });
       if (route === '/') {
@@ -48,7 +56,8 @@ async function captureLocale(browser, locale) {
       await page.screenshot({ path: mobilePath, fullPage: true });
     }
   }
-  await context.close();
+  await publicContext.close();
+  await authenticatedContext.close();
 }
 
 test('capture demo screen set', async ({ browser }) => {

@@ -61,11 +61,15 @@ jobs:
         run: pnpm test
       - name: Web translation catalogue parity
         run: pnpm test:web-i18n
-      - name: Build web for recording e2e
-        run: pnpm --filter @echoes-of-home/web build
-      - name: Start web for recording e2e
+      - name: Web server-session guard unit tests
+        run: node --experimental-strip-types --test apps/web/test/session.test.mjs
+      - name: Start local API session fixture for web checks
+        run: nohup node apps/web/test/auth-fixture-api.mjs > /tmp/echoes-auth-fixture.log 2>&1 &
+      - name: Build web for browser checks
+        run: API_BASE_URL=http://127.0.0.1:4100 pnpm --filter @echoes-of-home/web build
+      - name: Start web for browser checks
         run: |
-          pnpm --filter @echoes-of-home/web exec next start --hostname 127.0.0.1 --port 3000 > /tmp/echoes-web.log 2>&1 &
+          API_BASE_URL=http://127.0.0.1:4100 pnpm --filter @echoes-of-home/web exec next start --hostname 127.0.0.1 --port 3000 > /tmp/echoes-web.log 2>&1 &
           web_pid=$!
           for attempt in $(seq 1 30); do
             if curl --fail --silent --show-error http://127.0.0.1:3000/record; then
@@ -83,6 +87,8 @@ jobs:
           exit 1
       - name: Transcript review accessibility (axe)
         run: pnpm --filter @echoes-of-home/web test:a11y
+      - name: Landing and authenticated route gate (Playwright)
+        run: pnpm --filter @echoes-of-home/web exec playwright test test/auth-gate.spec.mjs
       - name: Recording upload resume e2e (Playwright)
         run: pnpm --filter @echoes-of-home/web exec env RUN_PLAYWRIGHT=1 node --experimental-strip-types --test test/recording.e2e.test.mjs
       - name: Authorization policy matrix
@@ -112,3 +118,98 @@ jobs:
         if: ${{ env.RAILWAY_TOKEN != '' }}
         continue-on-error: true
         run: railway config plan --file .railway/railway.ts --environment staging --json
+  web-changes:
+    name: Detect web changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changed.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA="HEAD^"
+          fi
+          if git diff --quiet "$BASE_SHA" HEAD -- apps/web; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  visual-screenshots:
+    name: Visual screenshot set (before and after)
+    needs: [checks, web-changes]
+    if: needs.web-changes.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium
+        run: pnpm --filter @echoes-of-home/web exec playwright install --with-deps chromium
+      - name: Start local API session fixture for screenshots
+        run: nohup node apps/web/test/auth-fixture-api.mjs > /tmp/echoes-auth-fixture.log 2>&1 &
+      - name: Capture after screenshots
+        run: |
+          API_BASE_URL=http://127.0.0.1:4100 pnpm --filter @echoes-of-home/web build
+          API_BASE_URL=http://127.0.0.1:4100 pnpm --filter @echoes-of-home/web exec next start --hostname 127.0.0.1 --port 3000 > /tmp/echoes-web-after.log 2>&1 &
+          after_pid=$!
+          trap 'kill "$after_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3000/; then break; fi
+            sleep 2
+          done
+          SCREENSHOT_DIR=/tmp/echoes-screenshots SCREENSHOT_VARIANT=after pnpm --filter @echoes-of-home/web exec playwright test test/visual-screenshots.spec.mjs
+          kill "$after_pid"
+          trap - EXIT
+      - name: Capture before screenshots from comparison revision
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BEFORE_SHA="$PR_BASE_SHA"
+          else
+            BEFORE_SHA="$PUSH_BEFORE_SHA"
+            if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              git fetch origin main --depth=50
+              BEFORE_SHA="$(git merge-base HEAD origin/main)"
+            fi
+          fi
+          test -n "$BEFORE_SHA"
+          git worktree add /tmp/echoes-of-home-before "$BEFORE_SHA"
+          cd /tmp/echoes-of-home-before
+          cp "$GITHUB_WORKSPACE/apps/web/test/visual-screenshots.spec.mjs" apps/web/test/visual-screenshots.spec.mjs
+          cp "$GITHUB_WORKSPACE/apps/web/test/auth-fixture-api.mjs" apps/web/test/auth-fixture-api.mjs
+          pnpm install --frozen-lockfile
+          API_BASE_URL=http://127.0.0.1:4100 pnpm --filter @echoes-of-home/web build
+          API_BASE_URL=http://127.0.0.1:4100 pnpm --filter @echoes-of-home/web exec next start --hostname 127.0.0.1 --port 3001 > /tmp/echoes-web-before.log 2>&1 &
+          before_pid=$!
+          trap 'kill "$before_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3001/; then break; fi
+            sleep 2
+          done
+          SCREENSHOT_DIR=/tmp/echoes-screenshots SCREENSHOT_VARIANT=before WEB_BASE_URL=http://127.0.0.1:3001 pnpm --filter @echoes-of-home/web exec playwright test test/visual-screenshots.spec.mjs
+          kill "$before_pid"
+          trap - EXIT
+      - name: Hash-diff before and after screenshots
+        run: node apps/web/test/compare-screenshots.mjs /tmp/echoes-screenshots
+      - name: Upload before and after screenshots
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: echoes-of-home-visual-screenshots-${{ github.sha }}
+          path: /tmp/echoes-screenshots
+          if-no-files-found: error
+          retention-days: 14
